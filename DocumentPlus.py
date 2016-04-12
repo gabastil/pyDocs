@@ -108,7 +108,7 @@ class DocumentPlus(Document):
 		# Return listOfResults[:-1] because the last tuple contains -1 (negative one)
 		return listOfResults[:-1]
 
-	def findLines(self, text, term, scope = 75):
+	def findLines(self, text, term, scope=75):
 		"""	Find the specified term in the text and return its surrounding context
 			@param	text: text String to search term in
 			@param	term: String term to search for
@@ -137,7 +137,7 @@ class DocumentPlus(Document):
 
 		return listOfResults[:-1]
 
-	def findTokens(self, text, term, scope = 7, sort = False):
+	def findTokens(self, text, term, scope=7, sort=False):
 		"""	find the specified term in the text and return its surrounding token context
 			@param	text: text String to search term in
 			@param	term: String term to search for
@@ -179,7 +179,6 @@ class DocumentPlus(Document):
 		textWithoutStopWords   = self.removeStopWords(textWithoutPunctuation)
 
 		return textWithoutStopWords
-
 
 	def addStopWord(self, newStopWord):
 		""" Add a new stop word to this class's list
@@ -271,7 +270,7 @@ class DocumentPlus(Document):
 
 		return text
 
-	def findOwnLines(self, term, scope = 75):
+	def findOwnLines(self, term, scope=75):
 		"""	Find the specified term in the text and return its surrounding context
 			@param	term: String term to search for
 			@param	scope:	number of leading and trailing characters to include

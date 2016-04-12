@@ -37,11 +37,10 @@ __email__       = "a5rjqzz@mmm.com"
 __status__      = "Deployed"
 
 from Spreadsheet import Spreadsheet
-import os
 
 class SpreadsheetPlus(Spreadsheet):
 
-	def __init__(self, filePath1 = None, filePath2 = None, savePath = None):
+	def __init__(self, filePath1=None, filePath2=None, savePath=None):
 		""" Initialize an instance of this class
 			@param  filePath1: path of the first  spreadsheet file
 			@param  filePath2: path of the second spreadsheet file
