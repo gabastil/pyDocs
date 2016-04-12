@@ -197,45 +197,6 @@ class SpreadsheetPlus(Spreadsheet):
 		
 		super(spreadsheetPlus, self).save(savePath=savePath, saveContent=self.spreadsheet, saveType=saveType)
 
-	'''
-	def save(self, name = "transformed_spreadsheet", saveAs = "txt", delimiter = "\t", savePath = None):
-		"""
-			Save the spreadsheet to a file. User can name the file and choose the type of file to save as (i.e., txt, csv, tsv, etc.)
-
-			name:       indicate the name of the file to output the data
-			saveAs:     indicate the type of the file to output the data
-			delimiter:  indicate the type of delimiter to use for the data
-			savePath:   indicate the location where the save file should be stored
-		"""
-
-		if self.spreadsheet_transposed:
-			self.transpose(3)
-
-		name = "{0}.{1}".format(name, saveAs)
-		output = self.toString()
-
-		if savePath is not None:
-			originPath = os.getcwd()
-
-			os.chdir(savePath)
-			self.saveFile(name, output)
-			os.chdir(originPath)
-		else:
-			self.saveFile(name, output)
-
-	def saveFile(self, name, output):
-		"""
-			saveFile() saves the output onto memory.
-
-			name:   name of the file to be saved.
-			output: a string of the contents to be saved.
-		"""
-
-		saveFile = open(name, "w")
-		saveFile.write(output)
-		saveFile.close()
-	'''
-
 if __name__=="__main__":
 
 	filePath1 = "../files/debridementSamples.txt"
@@ -243,5 +204,5 @@ if __name__=="__main__":
 
 	d = SpreadsheetPlus(filePath1, filePath2)
 	print d.getSpreadsheet()
-	d.transpose(2)
+	d.transpose(1)
 	print d.getSpreadsheet()
