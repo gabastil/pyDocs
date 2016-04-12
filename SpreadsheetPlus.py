@@ -47,8 +47,7 @@ class SpreadsheetPlus(Spreadsheet):
 			@param  filePath2: path of the second spreadsheet file
 			@param  savePath: write to this location
 		"""
-		
-		self.spreadsheetPlus= list()	#list containing spreadsheet
+		self.spreadsheetPlus= list()	#list containing spreadsheet (e.g., Drools)
 		self.filePath2		= filePath2	#location of the spreadsheet
 
 		self.loadedPlus		= False		#spreadsheet loaded?
@@ -65,11 +64,10 @@ class SpreadsheetPlus(Spreadsheet):
 		if filePath2 is not None:
 			self.initializePlus(filePath2)
 	
-	def initializePlus(self, filePath = None, sep = "\t"):
+	def initializePlus(self, filePath=None, sep="\t"):
 		""" Open the file and parse out rows and columns
 			@param	filePath: spreadsheet file to load into memory
 		"""
-		
 		openedFilePath = self.open(filePath).splitlines()
 
 		for line in openedFilePath:
@@ -78,7 +76,7 @@ class SpreadsheetPlus(Spreadsheet):
 		self.filePath2 	= filePath
 		self.loadedPlus	= True
 
-	def toStringPlus(self, fileToString = None):
+	def toStringPlus(self, fileToString=None):
 		""" Print out the input to screen
 			@param	fileToString: string to print
 		"""
@@ -108,11 +106,10 @@ class SpreadsheetPlus(Spreadsheet):
 
 			return spreadsheetAsString
 		
-	def transpose(self, sheet = 1):
+	def transpose(self, sheet=1):
 		""" Transpose a spreadsheet's rows and columns
 			@param	sheet: spreadsheet to tranpose (1=spreadsheet, )
 		"""
-
 		# If 1, transpose the spreadsheet from filePath1
 		if sheet == 1:
 			super(SpreadsheetPlus, self).transpose()
@@ -123,9 +120,9 @@ class SpreadsheetPlus(Spreadsheet):
 			
 			# CALL THESE JUST ONCE BEFORE LOOP(S)
 			append = temporary_spreadsheet.append
-			longest_row = len(max(self.spreadsheetPlus, key = len))
+			longest_row = len(max(self.spreadsheetPlus, key=len))
 
-			# Loop through the longest row (if transposedPlus=False) or column (if transposedPlus = True)
+			# Loop through the longest row (if transposedPlus=False) or column (if transposedPlus=True)
 			for index in xrange(longest_row):
 
 				# At this index, insert a list for the new row/column
@@ -134,53 +131,71 @@ class SpreadsheetPlus(Spreadsheet):
 				# CALL THESE JUST ONCE BEFORE LOOP(S)
 				append2 = temporary_spreadsheet[index].append
 
+				# Loop through the lines of spreadsheetPlus to transpose rows and columns
 				for line in self.spreadsheetPlus:
 					try:
 						append2(line[index])
 					except(IndexError):
 						append2("")
 
-			self.spreadsheetPlus            = temporary_spreadsheet
-			self.transposedPlus = not(self.transposedPlus)
+			self.spreadsheetPlus = temporary_spreadsheet
+			self.transposedPlus	 = not(self.transposedPlus)
 
+		# If 3, transpose both spreadsheets (i.e., filePath1, filePath2)
 		elif sheet == 3:
 			self.transpose(1)
 			self.transpose(2)
+
+		# If no number matches, return this error
 		else:
-			print "Please indicate spreadsheet 1 or 2. Indicate 3 for both."
+			return ValueError("Please indicate spreadsheet 1 or 2. \
+							   Enter 3 for both. (e.g., transpose(3))")
 
 	def transform(self,*newColumns):
-		"""
-			transform() creates a new spreadsheet consisting of the specified columns in *newColumns.
-			Does not return anything. This method alters the data structure's self.spreadsheet member.
-
-			*newColumns:    a list of columns to include in the new spreadsheet.
+		"""	Create a new spreadsheet with specified columns
+			@param	newColumns: columns to include from the old spreadsheet
 		"""
 
+		# Transpose spreadsheet to loop across columns
+		if not self.transposed:
+			self.transpose(1)
+
+		# If no columns are specified, default to 1,4,5,6
 		if len(newColumns) < 1:
-			#Corresponds to columns indicating: DICE-Code, pre-text, match, and post-text
-			newColumns = [1,4,5,6] 
-		else:
-			newColumns = list(newColumns)
-			
-		if not self.spreadsheet_transposed:
-			self.transpose(3)
 
-		newSpreadsheet = []
+			#Corresponds to columns: DICE-Code, pre-text, match, and post-text
+			newColumns = (1,4,5,6)
 
+		newSpreadsheet = list()
 		append = newSpreadsheet.append
+
+		# Loop through the specified columns
 		for column in newColumns:
 			append(self.spreadsheet[column])
 
-		self.old_ss = self.spreadsheet
+		#--x self.oldSheet	 = self.spreadsheet
 		self.spreadsheet = newSpreadsheet
-		self.spreadsheet_transformed = True
+		self.transformed = True
 
 	def getSpreadsheetPlus(self):
 		""" Get this Spreadsheet
 			@return	List of rows and columns with content
 		"""
 		return self.spreadsheetPlus
+
+	def save(self, sheet=0, savePath=None, saveContent=None, saveType='w'):
+		"""	Write sheet to file
+			@param	sheet: spreadsheet (1=spreadsheet;2=spreadsheetPlus)
+			@param	savePath: name of the file to be saved
+			@param	saveContent: list of rows/columns to be saved
+			@param	saveType: indicate overwrite ('w') or append ('a')
+		"""
+		if sheet == 1:
+			saveContent = self.prepareForSave(self.spreadsheet)
+		elif sheet == 2:
+			saveContent = self.prepareForSave(self.spreadsheetPlus)
+		
+		super(spreadsheetPlus, self).save(savePath=savePath, saveContent=self.spreadsheet, saveType=saveType)
 
 	'''
 	def save(self, name = "transformed_spreadsheet", saveAs = "txt", delimiter = "\t", savePath = None):

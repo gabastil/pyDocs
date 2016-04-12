@@ -22,7 +22,7 @@
 # 3. [2016/02/29] - changed wording of notes in line 17 from '... class is used in the following ...' to '... class is directly inherited by the following ...'.
 # 4. [2016/03/07] - removed unused method - def determineGroupByRange(self, columnToBeDetermined = 0, rangeToBeDetermined = 0)
 # - - - - - - - - - - - - -
-""" creates a manipulable spreadsheet object from a text file.
+"""	Creates a manipulable spreadsheet object from a text file.
 
 The Spreadsheet class is used to represent text files as objects for further
 use by other classes. This is a base class and does not inherit from other
@@ -43,7 +43,7 @@ __status__      = "Deployed"
 class Spreadsheet(object):
 
 	def __init__(self, filePath = None, savePath = None):
-		""" Initialize an instance of this class
+		"""	Initialize an instance of this class
 			@param  filePath: path of the spreadsheet file to be loaded
 			@param	savePath: write to this location
 		"""
@@ -63,23 +63,23 @@ class Spreadsheet(object):
 			self.initialize(filePath)
 
 	def __getitem__(self, key):
-		""" Enable list[n] syntax
+		"""	Enable list[n] syntax
 			@param  key: index number of item.
 		"""
 		return self.spreadsheet[key]
 	
 	def __iter__(self):
-		""" Enable iteration of this class
+		"""	Enable iteration of this class
 		"""
 		return self
 
 	def __len__(self):
-		""" Return number of items in spreadsheet
+		"""	Return number of items in spreadsheet
 		"""
 		return len(self.spreadsheet)
 
 	def next(self):
-		""" Get next item in iteration
+		"""	Get next item in iteration
 		"""
 		try:
 			self.iter_index += 1
@@ -89,7 +89,7 @@ class Spreadsheet(object):
 			raise StopIteration
 	
 	def initialize(self, filePath = None, sep = "\t"):
-		""" Open the file and parse out rows and columns
+		"""	Open the file and parse out rows and columns
 			@param	filePath: spreadsheet file to load into memory
 		"""
 		
@@ -102,7 +102,7 @@ class Spreadsheet(object):
 		self.loaded 	 = True
 
 	def open(self, filePath):
-		""" Opens an indicated text file for processing
+		"""	Opens an indicated text file for processing
 			@param	filePath: path of file to load
 			@return	String of opened text file
 		"""
@@ -112,7 +112,7 @@ class Spreadsheet(object):
 		return fileIn2
 
 	def save(self, savePath=None, saveContent=None, saveType='w'):
-		"""	write content out to a file
+		"""	Write content out to a file
 			@param	savePath: name of the file to be saved
 			@param	saveContent: list of rows/columns to be saved
 			@param	saveType: indicate overwrite ('w') or append ('a')
@@ -131,52 +131,48 @@ class Spreadsheet(object):
 			@param	spreadsheet: list of rows/columns to prepare
 			@return	String of spreadsheet in normal form (e.g., not transposed)
 		"""
-		if self.transposed:
-			self.transpose()
-
-		# CALL THESE JUST ONCE BEFORE LOOP(S)
-		listOfRows = list()
-		append = listOfRows.append
+		rowList = list()
+		append	= rowList.append
 
 		for row in spreadsheet:
 			append("\t".join(row))
 
-		saveContent = "\n".join(listOfRows)
+		saveContent = "\n".join(rowList)
 
 		return saveContent
 	
 	def getSavePath(self):
-		"""	get the save path
+		"""	Get the save path
 			@return String of the save path
 		"""
 		return self.savePath
 
 	def getFilePath(self):
-		""" get the file path
+		"""	Get the file path
 			@return	String of the file path
 		"""
 		return self.filePath
 
 	def getSpreadsheet(self):
-		""" Get this Spreadsheet
+		"""	Get this Spreadsheet
 			@return	List of rows and columns with content
 		"""
 		return self.spreadsheet
 
 	def setSavePath(self, savePath):
-		"""	set the location for saved files
+		"""	Set the location for saved files
 			@param	savePath: location to store saved files
 		"""
 		self.savePath = savePath
 
 	def setFilePath(self, filePath):
-		"""	set this object to a new file
+		"""	Set this object to a new file
 			@param	filePath: location to new file
 		"""
 		self.initialize(filePath)
 
 	def toString(self, fileToString = None):
-		""" Print input to screen
+		"""	Print input to screen
 			@param fileToString: file to print out as string to screen.
 		"""
 		
@@ -184,11 +180,9 @@ class Spreadsheet(object):
 			fileToString = self.spreadsheet
 			
 		if self.initialized:
-			
-			# CALL THESE JUST ONCE BEFORE LOOP(S)
 			join = str.join
-			# - - - - - - - - - - - - - - - - - -
 
+			# Loop through the lines to join them as strings
 			for line in fileToString:
 				print join("\t\t", line)
 		else:
@@ -198,7 +192,7 @@ class Spreadsheet(object):
 		print "\n\n"
 		
 	def transpose(self):
-		""" Transpose this spreadsheet's rows and columns
+		"""	Transpose this spreadsheet's rows and columns
 		"""
 		temporarySpreadsheet = list()
 					
@@ -228,7 +222,7 @@ class Spreadsheet(object):
 		self.transposed = not(self.transposed)
 
 	def reset(self):
-		"""	reset all data in this class
+		"""	Reset all data in this class
 		"""
 
 		self.spreadsheet = list()	#list containing spreadsheet
