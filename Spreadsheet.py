@@ -88,6 +88,19 @@ class Spreadsheet(object):
 			self.iter_index = 0
 			raise StopIteration
 	
+	def addColumn(self, name="New", fillWith=" "):
+		"""	Add a column to the spreadsheet
+			@param	name: name of column
+		"""
+		# Transpose spreadsheet to add column
+		if not self.transposed:
+			self.transpose()
+
+		newColumn 	 = [fillWith] * len(self.spreadsheet[0])
+		newColumn[0] = name
+
+		self.spreadsheet.append(newColumn)
+
 	def initialize(self, filePath = None, sep = "\t"):
 		"""	Open the file and parse out rows and columns
 			@param	filePath: spreadsheet file to load into memory

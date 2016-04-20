@@ -64,11 +64,12 @@ class LoopDir(object):
 		"""	constructor for instance.
 			@param	directory - folder location
 		"""
-		self.directory	  	= directory
-		self.directorySet   = False
-		self.directoryList  = []
-		self.iterationIndex = 0
+		self.directory	  	= directory	# Path to directory
+		self.directorySet   = False		# If directory is set --> True
+		self.directoryList  = list()	# List of files and folders in directory
+		self.iterationIndex = 0			# For iterable
 
+		# If directory is specified, set directory
 		if directory is not None:
 			self.setDir(directory)
 
@@ -80,7 +81,7 @@ class LoopDir(object):
 		try:
 			return self.directoryList[key]
 		except(IndexError):
-			pass
+			return IndexError("Directory item does not exist.")
 		
 	def __iter__(self):
 		"""	returns class as part of loop in conjunction with next().
@@ -121,9 +122,6 @@ class LoopDir(object):
 			@param printOut   - print to screen or return results
 		"""
 		
-		#if self.directory is None:
-		#	self.directory = directory
-
 		if function is None:
 			print "[ERROR] No function specified. No processes started. None returned."
 			return None
