@@ -54,7 +54,6 @@ import time
 
 class SpreadsheetSearch(SpreadsheetPlus, DocumentPlus):
 
-
 	def __init__(self, fileToAnalyze = None, fileWithRules = None):
 		"""	this class inherits attributes and methods from SpreadsheetPlus and
 			DocumentPlus. This class enables the user to load two spreadsheets, 
@@ -120,6 +119,7 @@ class SpreadsheetSearch(SpreadsheetPlus, DocumentPlus):
 			newColumn[0]    = name
 			self.spreadsheet.append(newColumn)
 			self.spreadsheet_transposed = True
+
 
 	def fillColumn(self, name = None, fillWith = None, sheet = 1):
 		"""	inserts text into a specified column in the specified sheet.
@@ -308,7 +308,7 @@ class SpreadsheetSearch(SpreadsheetPlus, DocumentPlus):
 		super(SpreadsheetSearch, self).save(name, saveAs, delimiter, savePath)      # (2) Save spreadsheet
 
 		return name
-		
+	
 	def superFind(self, dice, termIndex = 4, sufficiency = "-I", fileType = 1):
 		"""	takes a list of prepared terms with respect to the DICE code and 
 			searches for those DICE associated terms in the excerpts spread-

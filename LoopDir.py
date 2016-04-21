@@ -123,24 +123,32 @@ class LoopDir(object):
 		"""
 		
 		if function is None:
-			print "[ERROR] No function specified. No processes started. None returned."
-			return None
+			return ValueError("No function specified. No processes started. Nothing returned.")
 
-		directoryList = os.listdir(directory)
+		directoryList = list()#os.listdir(directory)
+		outputResults = list()
+
+		# If False, apply function to folders. Otherwise, apply function to files.
+		if actOnFiles == False:
+			isGood = os.path.isdir
+		else:
+			isGood = os.path.isfile
+
+		for item in os.listdir(directory):
+			if isGood(item):
+				directoryList.append(item)
+
 		directoryList = sorted(directoryList, key=lambda item: item.split('.')[-1], reverse=True)
 
-		outputResults = list()
 
 		# CALL THESE JUST ONCE BEFORE LOOP(S)
 		append = outputResults.append
-		isGood = os.path.isfile
+		#isGood = os.path.isfile
 		index  = directoryList.index
 		unit   = len(directoryList)/10 if len(directoryList) >= 10 else 1
-		# - - - - - - - - - - - - - - - - - -
 
-		if actOnFiles == False:
-			isGood = os.path.isdir
 
+		# Loop through the 
 		for item in directoryList:
 			if isGood(item):
 				if appendToList:

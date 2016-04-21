@@ -13,7 +13,8 @@
 #
 # To see the script run, go to the bottom of this page. 
 #
-# This class is not directly inherited by any other class.
+# This class is directly inherited by:
+#		- pyWeb/Web.py
 #
 # Updates:
 # 1. [2016/03/10] - added documentation for all methods. Moved convert method out of the scripting pathway. Added HTMLStripperObject and LoopDirObject parameters to convert method.
@@ -89,15 +90,22 @@ class HTMLStripper(HTMLParser):
 		html = fileIn.read()
 		fileIn.close()
 
+		return self.strip(html)
+
+	def strip(self, text):
+		"""	remove HTML tags from an input text
+			@param	text: text with HTML tags
+			@return	String text without HTML tags
+		"""
+		
 		# Send the file to the HTMLParser to extract all HTML tags, results use handle_data() to put output in self.fed
-		self.feed(html)
+		self.feed(text)
 		output = self.get_data().splitlines()
 		output = (self.clear_tabs(L) for L in output if not self.is_blank(L))
 
 		# Close HTML feed and clear self.fed in preparation for next document
 		self.close()
 		self.fed = []
-
 		return '\n'.join(output)
 
 def convert(directory, HTMLStripperObject, LoopDirObject):
