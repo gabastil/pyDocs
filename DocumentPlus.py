@@ -61,6 +61,26 @@ class DocumentPlus(Document):
 		self.stop_puncs   = self.open("./data/stoppuncs.txt").split()
 		self.stop_words   = self.open("./data/stopwords.txt").split()
 
+	def addStopPunctuation(self, newStopPunctuation):
+		""" Add a new stop punctuation to this class's list
+			@param	newStopPunctuation: new stop punctuation to add to this object
+		"""
+		newStopPunctuation = newStopPunctuation.lower()
+
+		# If stop punctuation is not in the list already, add it
+		if newStopPunctuation not in self.stop_puncs:
+			self.stop_puncs.append(newStopPunctuation)
+
+	def addStopWord(self, newStopWord):
+		""" Add a new stop word to this class's list
+			@param	newStopWord: new stop word to add to this object
+		"""
+		newStopWord = newStopWord.lower()
+
+		# If stop word is not in the list already, add it
+		if newStopWord not in self.stop_words:
+			self.stop_words.append(newStopWord)
+
 	def contains(self, term):
 		"""	Return true if term in self.textFile
 			@param	term: term to check in this document
@@ -70,6 +90,12 @@ class DocumentPlus(Document):
 			return True
 		
 		return False
+
+	def deleteStopWord(self, stopWordToRemove):
+		""" Remove a stop word from this class's list
+			@param	stopWordToRemove: stop word to remove from this object
+		"""
+		self.stop_words.remove(stopWordToRemove.lower())
 
 	def find(self, text, term):
 		"""	find the specified term in the text and return a list of indices
@@ -95,7 +121,7 @@ class DocumentPlus(Document):
 			@param	text: text String to search term in
 			@param	term: String term to search for
 			@param	scope:	number of leading and trailing characters to include
-			@return	List of tuples with start and end indices for search term
+			@return	List of Strings with matching term
 		"""
 		listOfResults = list()
 
@@ -119,12 +145,67 @@ class DocumentPlus(Document):
 
 		return listOfResults[:-1]
 
+	def findOwnLines(self, term, scope=75):
+		"""	Find the specified term in the text and return its surrounding context
+			@param	term: String term to search for
+			@param	scope:	number of leading and trailing characters to include
+			@return	List of tuples with start and end indices for search term
+		"""
+		return self.findLines(text=' '.join(self.textFile), term=term, scope=scope)
+
+	def findTerms(self, text, terms, scope=50):
+		"""	find the specified terms in the text and return its surround context
+			@param	text: text String to search term in
+			@param	terms: list of term Strings [keyword, context term 1, ...]
+			@param	scope:	number of leading and trailing characters to include
+			@return	List of tuples with start and end indices for search term
+		"""
+		listOfResults  = list()
+
+		append  = listOfResults.append
+		replace	= str.replace
+
+		keywordIndices = self.find(text, terms[0])
+
+		# loop through the indices and check for dependencies if terms list has more than 1 term
+		for indices in keywordIndices:
+
+			leading  = text[indices[0]-scope:indices[0]]
+			trailing = text[indices[0]:indices[0]+scope]
+
+			leading  = replace(replace(leading, '\n', ''), '\t', ' ') 
+			trailing = replace(replace(trailing, '\n', ''), '\t', ' ') 
+
+			# if terms list has more than 1 term (i.e., contextual terms), see if present within scope
+			if len(terms) > 1:
+
+				# loop through the contextual terms and check for presence within scope
+				for term in terms[1:]:
+
+					# if term in either leading or trailing
+					if (term in leading.lower()) or (term in trailing.lower()):
+
+						excerpt = leading + trailing
+
+						if excerpt not in listOfResults:
+							append(excerpt+'\t'+term)
+
+			# if terms list has 1 term, just append the excerpt
+			else:
+
+				excerpt = leading + trailing
+
+				if excerpt not in listOfResults:
+					append(excerpt)
+
+		return listOfResults
+
 	def findTokens(self, text, term, scope=7, sort=False):
 		"""	find the specified term in the text and return its surrounding token context
 			@param	text: text String to search term in
 			@param	term: String term to search for
 			@param	scope: number of leading and trailing tokens to include
-			@return	List of tuples with start and end indices for search term
+			@return	List of Strings of tokens with matching term
 		"""
 		listOfResults = list()
 
@@ -152,6 +233,12 @@ class DocumentPlus(Document):
 
 		return listOfResults
 
+	def getStopPunctuation(self):
+		"""	Get all stop punctuation used in this class
+			@return	List of stop punctuation
+		"""
+		return self.stop_puncs
+
 	def getTokens(self, text):
 		"""	Get tokens from a document
 			@param	text: text String
@@ -169,27 +256,38 @@ class DocumentPlus(Document):
 		textWithoutPunctuation = self.removePunctuation(text)
 		return [word for word in textWithoutPunctuation.split() if len(word) >= 1]
 
-	def addStopWord(self, newStopWord):
-		""" Add a new stop word to this class's list
-			@param	newStopWord: new stop word to add to this object
+	def removePunctuation(self, text):
+		""" Remove all punctuation from an input text
+			@text	text: text String with punctuation to remove
+			@return	String of text without punctuation
 		"""
-		newStopWord = newStopWord.lower()
+		# Loop through all the punctuation in self.stop_puncs
+		for punctuation in self.stop_puncs:
 
-		# If stop word is not in the list already, add it
-		if newStopWord not in self.stop_words:
-			self.stop_words.append(newStopWord)
+			# Replace punctuation with leading and trailing spaces
+			text = text.replace(" " + punctuation, " ")
+			text = text.replace(punctuation + " ", " ")
 
-	def getStopWords(self):
-		"""	Get all stop words used in this class
-			@return	List of stop words
+			# Replace punctuation within the first and last 5 characters of the text
+			text = text[:5].replace(punctuation, "") + text[5:]
+			text = text[:-5] + text[-5:].replace(punctuation, "")
+
+			# Otherwise, remove the punctuation if not in list specified
+			if punctuation not in [".", ",", "-", "--"]:
+				text = text.replace(punctuation, "")
+
+		return text
+
+	def removeOwnStopWords(self, sort=True):
+		"""	Remove all stop words from this object's self.textFile variable
+			@param	sort: sort the output
 		"""
-		return self.stop_words
+		self.textFile = self.removeStopWords(self.textFile, sort)
 
-	def deleteStopWord(self, stopWordToRemove):
-		""" Remove a stop word from this class's list
-			@param	stopWordToRemove: stop word to remove from this object
+	def removeOwnPunctuation(self):
+		""" Remove all punctuation from this object's self.textFile variable
 		"""
-		self.stop_words.remove(stopWordToRemove.lower())
+		self.textFile = self.removePunctuation(self.open(self.filePath)).split()
 
 	def removeStopWords(self, text=None, sort=True):
 		"""	Remove all stop words from an input list of tokens
@@ -221,63 +319,6 @@ class DocumentPlus(Document):
 
 		return textWithoutStopWords
 
-	def addStopPunctuation(self, newStopPunctuation):
-		""" Add a new stop punctuation to this class's list
-			@param	newStopPunctuation: new stop punctuation to add to this object
-		"""
-		newStopPunctuation = newStopPunctuation.lower()
-
-		# If stop punctuation is not in the list already, add it
-		if newStopPunctuation not in self.stop_puncs:
-			self.stop_puncs.append(newStopPunctuation)
-
-	def getStopPunctuation(self):
-		"""	Get all stop punctuation used in this class
-			@return	List of stop punctuation
-		"""
-		return self.stop_puncs
-
-	def removePunctuation(self, text):
-		""" Remove all punctuation from an input text
-			@text	text: text String with punctuation to remove
-			@return	String of text without punctuation
-		"""
-		# Loop through all the punctuation in self.stop_puncs
-		for punctuation in self.stop_puncs:
-
-			# Replace punctuation with leading and trailing spaces
-			text = text.replace(" " + punctuation, " ")
-			text = text.replace(punctuation + " ", " ")
-
-			# Replace punctuation within the first and last 5 characters of the text
-			text = text[:5].replace(punctuation, "") + text[5:]
-			text = text[:-5] + text[-5:].replace(punctuation, "")
-
-			# Otherwise, remove the punctuation if not in list specified
-			if punctuation not in [".", ",", "-", "--"]:
-				text = text.replace(punctuation, "")
-
-		return text
-
-	def findOwnLines(self, term, scope=75):
-		"""	Find the specified term in the text and return its surrounding context
-			@param	term: String term to search for
-			@param	scope:	number of leading and trailing characters to include
-			@return	List of tuples with start and end indices for search term
-		"""
-		return self.findLines(text=' '.join(self.textFile), term=term, scope=scope)
-
-	def removeOwnStopWords(self, sort=True):
-		"""	Remove all stop words from this object's self.textFile variable
-			@param	sort: sort the output
-		"""
-		self.textFile = self.removeStopWords(self.textFile, sort)
-
-	def removeOwnPunctuation(self):
-		""" Remove all punctuation from this object's self.textFile variable
-		"""
-		self.textFile = self.removePunctuation(self.open(self.filePath)).split()
-
 	def setOwnTokens(self):
 		""" Set this object's self.textFile variable as tokens
 		"""
@@ -289,6 +330,8 @@ if __name__ =="__main__":
 	"""
 
 	d = DocumentPlus("files/archive/test.txt","data/")
+
+	text = d.open("data/docs/1230006.txt")
 	#d.find("This and th:at and ,ever$ything- spice @$%!@is wha#######t makes the world feel about right. in-s$pa@ce.")
 	t = d.find("This is a test for this thing, right, test?", "test")
 	t = d.findLines(d.open(d.filePath), "american")
@@ -305,3 +348,9 @@ if __name__ =="__main__":
 	print "\n.removePunctuation()\t", a
 	print ".removeStopWords()\t", b
 	print ".getTokens()\t", c
+
+	print d.find(text, "clinic")
+	print len(d.findTerms(text, ["the", "bed", "time", "patient"]))
+	print d.findTerms(text, ["the", "bed", "time", "patient"])
+	print len(d.findTerms(text, ["the"]))
+	print d.findTerms(text, ["the"])

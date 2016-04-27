@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Name:     Spreadsheet.py
-# Version:  1.2.2
+# Version:  1.0.0
 # Author:   Glenn Abastillas
 # Date:     August 21, 2015
 #
@@ -18,10 +18,11 @@
 #
 # Updates:
 # 1. [2015/12/04] - added: method open().
-# 2. [2016/02/09] - in load() method, removed lines 125 - 128 including else-statement. Moved file_in from inside nested else-statement. Version changed to 1.2.2.
+# 2. [2016/02/09] - in load() method, removed lines 125 - 128 including else-statement. Moved file_in from inside nested else-statement.
 # 3. [2016/02/29] - changed wording of notes in line 17 from '... class is used in the following ...' to '... class is directly inherited by the following ...'.
 # 4. [2016/03/07] - removed unused method - def determineGroupByRange(self, columnToBeDetermined = 0, rangeToBeDetermined = 0)
 # 5. [2016/04/18] - added: addColumn(), newColumn() and fillColumn() methods
+# 5. [2016/04/21] - added: addColumn(), newColumn() and fillColumn() methods
 # - - - - - - - - - - - - -
 """	Creates a manipulable spreadsheet object from a text file.
 
@@ -36,7 +37,7 @@ __copyright__   = "Copyright (c) August 21, 2015"
 __credits__     = "Glenn Abastillas"
 
 __license__     = "Free"
-__version__     = "1.2.2"
+__version__     = "1.0.0"
 __maintainer__  = "Glenn Abastillas"
 __email__       = "a5rjqzz@mmm.com"
 __status__      = "Deployed"
@@ -65,12 +66,14 @@ class Spreadsheet(object):
 		else:
 			self.spreadsheet.extend([columns])
 
+		self.COLUMN_ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 	def __getitem__(self, key):
 		"""	Enable list[n] syntax
 			@param  key: index number of item.
 		"""
 		return self.spreadsheet[key]
-	
+
 	def __iter__(self):
 		"""	Enable iteration of this class
 		"""
@@ -90,7 +93,7 @@ class Spreadsheet(object):
 		except(IndexError):
 			self.iter_index = 0
 			raise StopIteration
-	
+
 	def addColumn(self, newColumn=None):
 		"""	Add a column to the spreadsheet
 			@param	newColumn: (list) column to add
@@ -112,6 +115,127 @@ class Spreadsheet(object):
 		self.toColumns()
 		self.spreadsheet[index].append(content)
 
+	def fillColumn(self, column=-1, fillWith=" ", skipTitle=True, cellList=None):
+		"""	Fill a column with text
+			@param	column: column to fill (index or column name)
+			@param	fillWith: contents of new column
+			@param	cellList: list of tuples (cell, offset) to insert into the fillWith formula
+			@param	skipTitle: start filling on the second row
+		"""
+		# Transpose spreadsheet to edit column
+		self.toColumns()
+
+		initialIndex = 0
+		newColumn	 = list()
+		append		 = newColumn.append
+
+		# if column variable is a string (i.e., column name), get column with the same name's index	
+		if type(column) == type(str()):
+			column = self.getColumnIndex(column)
+
+		# if skipTitle is True, start loop at index 1 not 0			
+		if skipTitle==True:
+			append(self.spreadsheet[column][0])
+			initialIndex = 1
+
+		# if there is a a cellList, there are values to replace
+		if cellList != None:
+
+			# items in cellList are tuples
+			# the first part is the reference (e.g., "$A1" --> "$A{0}")
+			# the second part is the row displacement, if any, (e.g., "-1")
+			# for example, 	[("$A{0}", "1"), ("$C${0}", "-1")] becomes:
+			# 				["$A2", "$C$0"] at i-index == 1 in the loop
+
+			cellListLength = len(cellList)
+			columnForLoop  = len(self.spreadsheet[column])
+
+			# loop through the rows in the spreadsheet to fill content
+			for i in range(columnForLoop)[initialIndex:]:
+
+				fillWithToReplace = fillWith
+
+				# loop through the list of cells to insert into the fillWith formula
+				for j in xrange(cellListLength):
+
+					cellListValue  = cellList[j][1]
+
+					# if the cellList marker (i.e., {0}) to be replaced is a column
+					# the reference value has to be a letter
+					if type(cellListValue) == type(str()):
+						referenceValue = self.COLUMN_ALPHA[column]
+
+					# else, the reference value is a number
+					else:
+						referenceValue = str(i+cellListValue)
+
+					# reference cell to insert into the fillWith content
+					reference= cellList[j][0].replace("{0}", referenceValue)
+
+					# marker indicates where the reference should go (e.g., "{0} goes here and then {1}")
+					marker	 = "{}{}{}".format("{",str(j), "}")
+					
+					# replace the marker in the fillWith string with the reference cell
+					# e.g., "{0} goes here and then {1}"; marker = "{0}"; reference = "$A$1"
+					#		"$A$1 goes here and then {1}"
+					fillWithToReplace = fillWithToReplace.replace(marker, reference)
+
+				append(fillWithToReplace)
+
+		# if there is no cellList, just fill all cells with the same content
+		else:
+
+			columnForLoop = self.spreadsheet[column][initialIndex:]
+
+			# loop through the rows in the spreadsheet to fill content
+			for row in columnForLoop:
+				append(fillWith)
+
+		self.spreadsheet[column] = newColumn
+
+	def getColumnIndex(self, column):
+		"""	get the numerical index for a column
+			@param	column:	column character (e.g., 'A') or column name
+			@return	integer index of column specified
+		"""
+		if len(column)==1:
+			return self.COLUMN_ALPHA.index(column.upper())
+		else:
+			self.toRows()
+			columnIndex = self.spreadsheet[0].index(column)
+			self.toColumns()
+			return columnIndex
+
+	def getFilePath(self):
+		"""	Get the file path
+			@return	String of the file path
+		"""
+		return self.filePath
+
+	def getSavePath(self):
+		"""	Get the save path
+			@return String of the save path
+		"""
+		return self.savePath
+
+	def getSpreadsheet(self):
+		"""	Get this Spreadsheet
+			@return	List of rows and columns with content
+		"""
+		return self.spreadsheet
+
+	def initialize(self, filePath = None, sep = "\t"):
+		"""	Open the file and parse out rows and columns
+			@param	filePath: spreadsheet file to load into memory
+		"""
+		openedFilePath	 = self.open(filePath).splitlines()
+
+		for line in openedFilePath:
+			self.spreadsheet.append(line.split(sep))
+
+		self.filePath 	 = filePath
+		self.loaded 	 = True
+
 	def newColumn(self, name=" ", fillWith=" "):
 		"""	Add a new (empty) column to the spreadsheet
 			@param	name: name of column
@@ -126,62 +250,6 @@ class Spreadsheet(object):
 		self.spreadsheet.append(newColumn)
 		self.refresh()
 
-	def fillColumn(self, column=-1, fillWith=" ", skipTitle=True):
-		"""	Fill a column with text
-			@param	column: column to fill (index or column name)
-			@param	fillWith: contents of new column
-		"""
-		# Transpose spreadsheet to edit column
-		self.toColumns()
-
-		initialIndex = 0
-
-		newColumn	 = list()
-		append		 = newColumn.append
-
-		if type(column) == type(str()):
-			self.toRows()
-			column = self.spreadsheet[0].index(column)
-			self.toColumns()
-
-		if skipTitle==True:
-			append(self.spreadsheet[column][0])
-			initialIndex = 1
-
-		for cell in self.spreadsheet[column][initialIndex:]:
-			append(fillWith)
-
-		self.spreadsheet[column] = newColumn
-
-	def rename(self, name=None, index=-1):
-		"""	Rename a specified column
-			@param	name: name for the column
-			@param	index: column index
-		"""
-		# Transpose spreadsheet to edit column
-		self.toColumns()
-
-		self.spreadsheet[index][0] = name
-
-	def setCell(self, row, column, content):
-		""" Set a cell to content
-			@param	content: content to fill cell
-		"""
-		self.toRows()
-		self.spreadsheet[row][column]=content
-
-	def initialize(self, filePath = None, sep = "\t"):
-		"""	Open the file and parse out rows and columns
-			@param	filePath: spreadsheet file to load into memory
-		"""
-		openedFilePath	 = self.open(filePath).splitlines()
-
-		for line in openedFilePath:
-			self.spreadsheet.append(line.split(sep))
-
-		self.filePath 	 = filePath
-		self.loaded 	 = True
-
 	def open(self, filePath):
 		"""	Opens an indicated text file for processing
 			@param	filePath: path of file to load
@@ -191,21 +259,6 @@ class Spreadsheet(object):
 		fileIn2 = fileIn1.read()
 		fileIn1.close()
 		return fileIn2
-
-	def save(self, savePath=None, saveContent=None, saveType='w'):
-		"""	Write content out to a file
-			@param	savePath: name of the file to be saved
-			@param	saveContent: list of rows/columns to be saved
-			@param	saveType: indicate overwrite ('w') or append ('a')
-		"""
-		if saveContent is None:
-			saveContent = self.prepareForSave()
-		else:
-			saveContent = self.prepareForSave(saveContent)
-
-		saveFile = open(savePath, saveType)
-		saveFile.write(saveContent)
-		saveFile.close()
 
 	def prepareForSave(self, spreadsheet=None):
 		"""	Prepare the spreadsheet for saving
@@ -226,30 +279,70 @@ class Spreadsheet(object):
 		saveContent = "\n".join(rowList)
 
 		return saveContent
-	
-	def getSavePath(self):
-		"""	Get the save path
-			@return String of the save path
-		"""
-		return self.savePath
 
-	def getFilePath(self):
-		"""	Get the file path
-			@return	String of the file path
+	def refresh(self):
+		""" Make sure all columns/rows are the same length
 		"""
-		return self.filePath
+		self.transpose()
+		self.transpose()
+		self.initialized = True
 
-	def getSpreadsheet(self):
-		"""	Get this Spreadsheet
-			@return	List of rows and columns with content
+	def rename(self, name=None, index=-1):
+		"""	Rename a specified column
+			@param	name: name for the column
+			@param	index: column index
 		"""
-		return self.spreadsheet
+		# Transpose spreadsheet to edit column
+		self.toColumns()
 
-	def setSavePath(self, savePath):
-		"""	Set the location for saved files
-			@param	savePath: location to store saved files
+		self.spreadsheet[index][0] = name
+
+	def removeColumn(self, column=-1):
+		"""	remove a column in self.spreadsheet
+			@param	column: index or string indicating column to remove
 		"""
-		self.savePath = savePath
+		# if column variable is a string (i.e., column name), get column with the same name's index	
+		if type(column) == type(str()):
+			column = self.getColumnIndex(column)
+
+		del self.spreadsheet[column]
+
+	def reset(self):
+		"""	Reset all data in this class
+		"""
+
+		self.spreadsheet = list()	#list containing spreadsheet
+
+		self.filePath	 = None		#location of the spreadsheet
+		self.savePath	 = None		#location of the spreadsheet
+
+		self.loaded		 = False	#spreadsheet loaded?
+		self.initialized = False	#spreadsheet initialized?
+		self.transposed	 = False	#checks if self.spreadsheet stores rows (=False) or columns (=True)
+
+		self.iter_index	 = 0		# Used for next() function
+
+	def save(self, savePath=None, saveContent=None, saveType='w'):
+		"""	Write content out to a file
+			@param	savePath: name of the file to be saved
+			@param	saveContent: list of rows/columns to be saved
+			@param	saveType: indicate overwrite ('w') or append ('a')
+		"""
+		if saveContent is None:
+			saveContent = self.prepareForSave()
+		else:
+			saveContent = self.prepareForSave(saveContent)
+
+		saveFile = open(savePath, saveType)
+		saveFile.write(saveContent)
+		saveFile.close()
+
+	def setCell(self, row, column, content):
+		""" Set a cell to content
+			@param	content: content to fill cell
+		"""
+		self.toRows()
+		self.spreadsheet[row][column]=content
 
 	def setFilePath(self, filePath):
 		"""	Set this object to a new file
@@ -257,12 +350,46 @@ class Spreadsheet(object):
 		"""
 		self.initialize(filePath)
 
+	def setSavePath(self, savePath):
+		"""	Set the location for saved files
+			@param	savePath: location to store saved files
+		"""
+		self.savePath = savePath
+
+	def sort(self, column=0, reverse=False, hasTitle=True):
+		""" Sort spreadsheet based on column
+			@param	column: column to sort by
+			@param	reverse: reverse sort
+		"""
+		self.toRows()
+		if hasTitle == True:
+			header = self.spreadsheet[0]
+			body = sorted(self.spreadsheet[1:], key=lambda row:row[column], reverse=reverse)
+			self.spreadsheet = [header] + body
+		else:
+			self.spreadsheet = sorted(self.spreadsheet, key=lambda row:row[column], reverse=reverse)
+
+	def toColumns(self):
+		"""	Transpose to columns
+		"""
+		# Transpose spreadsheet to edit column
+		if not self.transposed:
+			self.transpose()
+
+	def toRows(self):
+		"""	Transpose to rows
+		"""
+		# Transpose spreadsheet to edit rows
+		if self.transposed:
+			self.transpose()
+
 	def toString(self, fileToString = None):
 		"""	Print input to screen
 			@param fileToString: file to print out as string to screen.
 		"""
 		
 		if fileToString is None:
+			self.toRows()
 			fileToString = self.spreadsheet
 			
 		if self.initialized:
@@ -270,13 +397,15 @@ class Spreadsheet(object):
 
 			# Loop through the lines to join them as strings
 			for line in fileToString:
+
+				line = [str(item).rjust(20, ' ') for item in line]
 				print join("\t\t", line)
 		else:
 			for line in fileToString:
 				print line
 
 		print "\n\n"
-		
+
 	def transpose(self):
 		"""	Transpose this spreadsheet's rows and columns
 		"""
@@ -307,54 +436,6 @@ class Spreadsheet(object):
 		self.spreadsheet = temporarySpreadsheet
 		self.transposed = not(self.transposed)
 
-	def toColumns(self):
-		"""	Transpose to columns
-		"""
-		# Transpose spreadsheet to edit column
-		if not self.transposed:
-			self.transpose()
-
-	def toRows(self):
-		"""	Transpose to rows
-		"""
-		# Transpose spreadsheet to edit rows
-		if self.transposed:
-			self.transpose()
-
-	def sort(self, column=0, reverse=False, hasTitle=True):
-		""" Sort spreadsheet based on column
-			@param	column: column to sort by
-			@param	reverse: reverse sort
-		"""
-		self.toRows()
-		if hasTitle == True:
-			header = self.spreadsheet[0]
-			body = sorted(self.spreadsheet[1:], key=lambda row:row[column], reverse=reverse)
-			self.spreadsheet = [header] + body
-		else:
-			self.spreadsheet = sorted(self.spreadsheet, key=lambda row:row[column], reverse=reverse)
-
-	def refresh(self):
-		""" Make sure all columns/rows are the same length
-		"""
-		self.transpose()
-		self.transpose()
-
-	def reset(self):
-		"""	Reset all data in this class
-		"""
-
-		self.spreadsheet = list()	#list containing spreadsheet
-
-		self.filePath	 = None		#location of the spreadsheet
-		self.savePath	 = None		#location of the spreadsheet
-
-		self.loaded		 = False	#spreadsheet loaded?
-		self.initialized = False	#spreadsheet initialized?
-		self.transposed	 = False	#checks if self.spreadsheet stores rows (=False) or columns (=True)
-
-		self.iter_index	 = 0		# Used for next() function
-
 if __name__=="__main__":
 
 	#d = Spreadsheet("../files/debridementSamples.txt")
@@ -374,7 +455,7 @@ if __name__=="__main__":
 	print d.spreadsheet
 	print d.spreadsheet
 
-	p = Spreadsheet(columns=["blah", "booh", "bah", "ble"] + ["too", "me"])
+	p = Spreadsheet(columns=["col1", "booh", "bah", "ble"] + ["too", "me"])
 	p.newColumn("blech")
 	p.newColumn()
 	print "P:\t", p.spreadsheet
@@ -394,11 +475,18 @@ if __name__=="__main__":
 	p.fillColumn("too", "can")
 	p.addToColumn(4,"acd")
 	print "P:\t", p.spreadsheet
-	p.fillColumn("ble", "filledWithThis")
-	print "P:\t", p.spreadsheet
-	p.toRows()
+	p.fillColumn("ble", "{0}, {1}", cellList=[("$A{0}", 0), ("$C${0}", 1)])
+	p.fillColumn("col1", "{0}, {1}", cellList=[("{0}1", '0'), ("$C${0}", 1)])
+	#p.fillColumn("ble", "{0}, {1}")#, cellList=[("$A{0}", 0), ("$C${0}", 1)])
+	print "AFTER THE FILL:\t", p.spreadsheet
+	p.toColumns()
 	print "ddP:\t", p.spreadsheet
-	print p.sort(4)
-	print "P:\t", p.spreadsheet
-	print p.sort(4, hasTitle=False)
-	print "P:\t", p.spreadsheet
+	p.removeColumn("bah")
+	p.removeColumn("booh")
+	print "Removed column:\t", p.spreadsheet
+	print p.getColumnIndex('A')
+	#print p.sort(3)
+	#print "P:\t", p.spreadsheet
+	#print p.sort(4, hasTitle=False)
+	#print "P:\t", p.spreadsheet
+	#print "column index for 'A'", p.getColumnIndex('D')
