@@ -153,7 +153,7 @@ class DocumentPlus(Document):
 		"""
 		return self.findLines(text=' '.join(self.textFile), term=term, scope=scope)
 
-	def findTerms(self, text, terms, scope=50):
+	def findTerms(self, text, terms, scope=50, includeAll=True):
 		"""	find the specified terms in the text and return its surround context
 			@param	text: text String to search term in
 			@param	terms: list of term Strings [keyword, context term 1, ...]
@@ -161,6 +161,8 @@ class DocumentPlus(Document):
 			@return	List of tuples with start and end indices for search term
 		"""
 		listOfResults  = list()
+		listOfMatchesMain = list()
+		listOfMatchesSecondary = list()
 
 		append  = listOfResults.append
 		replace	= str.replace
@@ -173,8 +175,8 @@ class DocumentPlus(Document):
 			leading  = text[indices[0]-scope:indices[0]]
 			trailing = text[indices[0]:indices[0]+scope]
 
-			leading  = replace(replace(leading, '\n', ''), '\t', ' ') 
-			trailing = replace(replace(trailing, '\n', ''), '\t', ' ') 
+			leading  = replace(replace(leading, '\n', '_'), '\t', ' ') 
+			trailing = replace(replace(trailing, '\n', '_'), '\t', ' ') 
 
 			# if terms list has more than 1 term (i.e., contextual terms), see if present within scope
 			if len(terms) > 1:
@@ -183,12 +185,21 @@ class DocumentPlus(Document):
 				for term in terms[1:]:
 
 					# if term in either leading or trailing
-					if (term in leading.lower()) or (term in trailing.lower()):
+					if (replace(term, '*', '') in leading.lower()) or (replace(term, '*', '') in trailing.lower()):
 
-						excerpt = leading + trailing
+						# if '*' in term, do not add this context
+						if '*' in term:
+							pass
 
-						if excerpt not in listOfResults:
-							append(excerpt+'\t'+term)
+						# if '*' not indicated, add this context
+						else:
+							excerpt = leading + trailing
+
+							if excerpt not in listOfResults:
+								if includeAll==True:
+									append(excerpt+'\t'+text[indices[0]:indices[1]]+'\t'+term)
+								else:
+									append(excerpt)
 
 			# if terms list has 1 term, just append the excerpt
 			else:
@@ -196,7 +207,10 @@ class DocumentPlus(Document):
 				excerpt = leading + trailing
 
 				if excerpt not in listOfResults:
-					append(excerpt)
+					if includeAll==True:
+						append(excerpt+'\t'+text[indices[0]:indices[1]]+'\t')
+					else:
+						append(excerpt)
 
 		return listOfResults
 
@@ -238,6 +252,12 @@ class DocumentPlus(Document):
 			@return	List of stop punctuation
 		"""
 		return self.stop_puncs
+
+	def getStopWords(self):
+		"""	Get all stop words used in this class
+			@return	List of stop words
+		"""
+		return self.stop_words
 
 	def getTokens(self, text):
 		"""	Get tokens from a document

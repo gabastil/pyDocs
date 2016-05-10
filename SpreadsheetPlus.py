@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Name:     SpreadsheetPlus.py
-# Version:  1.2.0
+# Version:  1.0.0
 # Author:   Glenn Abastillas
 # Date:     September 21, 2015
 #
@@ -31,7 +31,7 @@ __copyright__   = "Copyright (c) August 21, 2015"
 __credits__     = "Glenn Abastillas"
 
 __license__     = "Free"
-__version__     = "1.2.1"
+__version__     = "1.0.0"
 __maintainer__  = "Glenn Abastillas"
 __email__       = "a5rjqzz@mmm.com"
 __status__      = "Deployed"

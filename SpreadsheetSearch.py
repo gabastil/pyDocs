@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Name:     SpreadsheetSearch.py
-# Version:  1.4.0
+# Version:  1.0.0
 # Author:   Glenn Abastillas
 # Date:     October 22, 2015
 #
@@ -42,7 +42,7 @@ __copyright__   = "Copyright (c) October 22, 2015"
 __credits__     = "Glenn Abastillas"
 
 __license__     = "Free"
-__version__     = "1.4.0"
+__version__     = "1.0.0"
 __maintainer__  = "Glenn Abastillas"
 __email__       = "a5rjqzz@mmm.com"
 __status__      = "Deployed"
@@ -54,7 +54,7 @@ import time
 
 class SpreadsheetSearch(SpreadsheetPlus, DocumentPlus):
 
-	def __init__(self, fileToAnalyze = None, fileWithRules = None):
+	def __init__(self, fileForAnalysis = None, fileWithRules = None, columns=None, *DICECodes):
 		"""	this class inherits attributes and methods from SpreadsheetPlus and
 			DocumentPlus. This class enables the user to load two spreadsheets, 
 			with the first containing raw data to be analyzed, and the second, 
@@ -67,403 +67,221 @@ class SpreadsheetSearch(SpreadsheetPlus, DocumentPlus):
 
 			1. "Results", which indicates whether or not a keyword was found in 
 				the initially insufficient query.
-			2. "Matched", which indicates the matched term found in the insuff-
+
+			[DEPRECATED] 2. "Matched", which indicates the matched term found in the insuff-
 				icient query.
-			3. "Excerpt", which shows a snippet of the matched keyword in its 
+			[DEPRECATED] 3. "Excerpt", which shows a snippet of the matched keyword in its 
 				context.
 
-			Stop words are drawn from the DocumentPlus class.
+			@param	fileForAnalysis : path to excerpts file to analyze
+			@param	fileWithRules : path to Drools Rules spreadsheet
+			@param	columns : columns to transform
+			@param	*DICECodes : list of DICE Codes
 		"""
+		super(SpreadsheetSearch, self).__init__(fileForAnalysis, fileWithRules) # save paths for both spreadsheets
 
-		super(SpreadsheetSearch, self).__init__(fileToAnalyze, fileWithRules) # save paths for both spreadsheets
+		if columns is None:
+			columns = [1,5,6,7,8,9,10,11,3,0]
+
+		if len(DICECodes) < 1:
+			DICECodes = ["CH001", "CH002", "CH003", "CH004", "CH005", "CH006", "CH007", "CH008", "CH009", "CH010", \
+						 "CH011", "CH012", "CH013", "CH014", "CH015", "CH016", "CH017", "CH018", "CH019", "CH020", \
+						 "CH021", "CH022", "CH023", "CH024", "CH025", "CH026", "CH027", "CH028", "CH029", "CH030"]
+
+		self.DICECodes = DICECodes         # List of DICE Codes to compile from the DROOLS RULES Spreadsheet
+		self.stop_words = DocumentPlus().getStopWords()
 
 		# Load and initialize both spreadsheets if indicated
-		if fileToAnalyze is not None and fileWithRules is not None:
-			super(SpreadsheetSearch, self).load()                      		# load spreadsheets into memory
-			super(SpreadsheetSearch, self).initialize()                		# intialize spreadsheets for processing (e.g., splitting on the comma)
-			super(SpreadsheetSearch, self).transform(1,5,6,7,8,9,10,11,3,0)	# reduce spreadsheet columns to pertinent number
+		if fileForAnalysis is not None and fileWithRules is not None:
+			#super(SpreadsheetSearch, self).load()                      		# load spreadsheets into memory
+			super(SpreadsheetSearch, self).initialize(fileForAnalysis)            # intialize spreadsheets for processing (e.g., splitting on the comma)
+			super(SpreadsheetSearch, self).transform(*columns)					# reduce spreadsheet columns to pertinent number
 
-		
-			self.results    = [" "] * len(self.spreadsheet[0])         		# List that contains indication of and location of matched terms.
-			self.indexes    = [" "] * len(self.spreadsheet[0])         		# List that contains the matched term's index from prepare terms method.
-			self.matched    = [" "] * len(self.spreadsheet[0])         		# List that contains the matched term.
-			self.excerpt    = [" "] * len(self.spreadsheet[0])         		# List that contains an excerpt of the matched term's context within a given scope.
-		
-		self.stop_words = super(SpreadsheetSearch, self).getStopWords()		# Removes extraneous, common words that do not contribute to analysis
+			#self.toColumns()
+			#print "Spreadsheet length1:\t", len(self.spreadsheet)
+			#super(SpreadsheetSearch, self).transform(8,4,5,6,0)	# reduce spreadsheet columns to pertinent number
+			#print "Spreadsheet length2:\t", len(self.spreadsheet)
 
-		self.diceCodes = ["CH001", "CH002", "CH003", "CH004", "CH005", "CH006", "CH007", "CH008", "CH009", "CH010", \
-						  "CH011", "CH012", "CH013", "CH014", "CH015", "CH016", "CH017", "CH018", "CH019", "CH020", \
-						  "CH021", "CH022", "CH023", "CH024", "CH025", "CH026", "CH027", "CH028", "CH029", "CH030"]         # List of DICE Codes to compile from the DROOLS RULES Spreadsheet
+			self.newColumn("Results")	# [col index = 10] List that contains indication of and location of matched terms.
+			self.newColumn("Indexes")	# [col index = 11] List that contains the matched term's index from prepare terms method.
+			self.newColumn("Matched")	# [col index = 12] List that contains the matched term.
+			#self.newColumn("Excerpt")	# [col index = 13] List that contains an excerpt of the matched term's context within a given scope.
 
-	def addColumn(self, name = "New Column", fillWith = " ", sheet = 3, length = 0):
-		"""	adds a new column to self.spreadsheet.
-			@param name: indicate the name of the column to be added
-			@param fillWith: indicate the filler to use for the blank column
-			@param sheet: spreadsheet to add columns to (3 means both spreadsheets)
-			@param length: length of column
-		"""
-
-		# If spreadsheets are not transposed, transpose them so loops loop over columns instead of rows
-		if not self.spreadsheet_transposed:
-
-			if len(self.spreadsheet) > 0:
-				self.transpose(sheet)
-
-		if len(self.spreadsheet) > 0:
-			newColumn       = [fillWith] * len(self.spreadsheet[0])     # create a column sharing the same length as others in the spreadsheet
-			newColumn[0]    = name                                      # assign a name to this column
-			self.spreadsheet.append(newColumn)                          # add the column to the spreadsheet
-		
-		else:
-			newColumn       = [fillWith] * length
-			newColumn[0]    = name
-			self.spreadsheet.append(newColumn)
-			self.spreadsheet_transposed = True
-
-
-	def fillColumn(self, name = None, fillWith = None, sheet = 1):
-		"""	inserts text into a specified column in the specified sheet.
-			@param name: name of the column to fill
-			@param fillWith: to insert into the cells of the specified column
-			@param sheet: spreadsheet whose column will be filled with text
-		"""
-
-		if name is None:
-			return "No column specified. Please enter a name into the name variable (e.g., name = \"column\""
-
-		# If spreadsheet is not transposed, tranpose it so loops loop over columns instead of rows
-		if not self.spreadsheet_transposed:
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			# If the spreadsheet is not transposed, revert it so that loops can work over columns rather than 
-			# rows. 3 is indicated to tranpose both spreadsheets.
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			self.transpose(sheet)
-
-		# CALL THESE JUST ONCE BEFORE LOOP(S)
-		lower   = str.lower
-		replace = fillWith.replace
-		# - - - - - - - - - - - - - - - - - -
-
-		for column in self.spreadsheet:
-			if lower(column[0]) == lower(name):
-				for cell in range(len(column[1:])):
-					#print "CELL RANGE", cell, "CELL TYPE", type(cell), "PLUS", cell+1
-					#print "COLUMN", column[cell+1], fillWith, replace("{C}", str(cell+2))
-					column[cell+1] = replace("{C}", str(cell+2))
-
-	def consolidate(self):
-		"""	appends the results, matched, and excerpt columns to the existing 
-			spreadsheet.
-		"""
-		if not self.spreadsheet_transposed:
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			# If the spreadsheet is not transposed, revert it so that loops can work over columns rather than 
-			# rows. 3 is indicated to tranpose both spreadsheets.
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-			self.transpose(3)
-
-		self.spreadsheet.append(self.results)       # append 'Results' column to spreadsheet
-		self.spreadsheet.append(self.indexes)       # append 'Term Index' column to spreadsheet
-		self.spreadsheet.append(self.matched)       # append 'Matched Term' column to spreadsheet
-		#self.spreadsheet.append(self.excerpt)       # append 'Excerpt' column to spreadsheet
-		
-	def extract(self, text, center, scope = 50, upper = None):
-		"""	extract allows users to grab an excerpt of the indicated text via 
-			'center'. Users can grab an extract to help in analyzing context 
-			for the chosen keyword match.
-
-			text 	--> string to be analyzed for excerpts
-			center 	--> indicates position of matched term
-			scope 	--> how many characters in front of and behind the matched 
-						term to include default is 50
-			upper 	--> indicates whether or not to return the excerpt in UPPER
-						case. Default is None.
-
-			returns a string of the excerpt 
-		"""
-		start = center - scope          # set the index for the beginning of the string
-		end   = center + scope          # set the index for the end of the string
-		
-		if start < 0:
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			# If the index for the beginning of the string is less than 0, change it to 0.
-			# There are no negative indices.
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-			start = 0
-
-		if end >= len(text):
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			# If the index for the end of the string is extendes past the length of the string,
-			# change it to the length of the string - 1 (because of 0-indexing).
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-			end = len(text) - 1
-
-		if upper is not None:
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			# If the user indicates a term for 'upper', then the excerpt will have a term in upper case.
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-			upperLen  = len(upper)
-			newCenter = center + upperLen
-			return text[start:center] + text[center:newCenter].upper() + text[newCenter:end]
-		else:
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			# If not, then excerpt will contain a term in lower case.
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-			upperLen = 0
-			return text[start:end]
+		#print "Spreadsheet\t", self.spreadsheet[-1][:3], self.spreadsheet[-2][:3], self.spreadsheet[-3][:3], self.spreadsheet[-4][:3], self.spreadsheet[-5][:3]
+		#print "Stopwords", self.stop_words[:10]
 
 	def prepareTerms(self, dice, termIndex = 4, sufficiency = "-S"):
 		"""	opens spreadsheet 2, which typically contains droolsrules.csv. 
 			Users can extract associated terms to be used in searching the ex-
 			cerpts document. Empty rows in the spreadsheet are skipped.
-
-			dice 		--> indicate the DICE code you are interested in com-
-							piling (e.g., CH001).
-			termIndex 	--> column in the spreadsheet (0-index) that contains
-							associated terms. default is 4, i.e., column E.
-			sufficiency --> indicate whether you want to compile associated 
-							terms belonging to insufficient "-I" or sufficient
-							"-S" terms.
-
-			Returns a sorted list of stop-word-free terms to use for superFind
+			@param	dice: DICE Code to compile
+			@param	termIndex: column with terms. Column E (termIndex=4).
+			@param	sufficiency: insufficient "-I" or sufficient "-S" terms.
+			@return	list of stop-word-free terms to use for superFind
 		"""
-		termList         = []
-		termsToSearchFor = []
+		termList = list()
+		#termsToSearchFor = list()
 
 		# CALL THESE JUST ONCE BEFORE LOOP(S)
 		extend = termList.extend
 		lower  = str.lower
 		split  = str.split
 		upper  = str.upper
-		# - - - - - - - - - - - - - - - - - -
 
-		for line in self.spreadsheet2:
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			# Cycle through each line, i.e., row in the spreadsheet for analysis.
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
+		# Loop through lines in the Drools Rules spreadsheet
+		for line in self.spreadsheetPlus:
 
-			if dice + sufficiency in upper(line[2]):
-				#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-				# If the dice + sufficiency (e.g., CH001-S) matches that of this line in the spreadsheet,
-				# examine the contents of the 5 column, i.e., column E
-				#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
+			# Examine column E (index=5) if DICE + sufficiency match (e.g., CH001-S)
+			if (dice + sufficiency in upper(line[2])) and line[termIndex] != "":
+				extend(split(lower(line[termIndex])))
+				## If column E (index=5) is empty, skip it
+				#if line[termIndex] == "":
+				#	pass
 
-				if line[termIndex] == "":
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-					# If the 5 column in the spreadsheet, i.e., column E, is empty:
-					# then do not look at this row. Skip it.
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-					pass
-
-				else:
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-					# Otherwise, if the 5th column in the spreadsheet, i.e., column E, contains associated terms,
-					# add these terms to the term list.
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-					extend(split(lower(line[termIndex])))
+				# If column E has terms, add terms to term list
+				#else:
+				#	extend(split(lower(line[termIndex])))
 		
-		#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-		# The following retains only unique terms removing all stop words. Then, it assigns a counter
-		# column for the next loop, which checks for word frequency and, subsequently, importance. 
-		#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
+		# Remove stop words and prepare output to count occurrence of terms
 		output = list(set(termList))
-		output = super(SpreadsheetSearch, self).remove_stop_words(output)
+		output = super(SpreadsheetSearch, self).removeStopWords(output)
 		output = [[t, 0] for t in output]
 
 		# CALL THESE JUST ONCE BEFORE LOOP(S)
 		index = output.index
-		# - - - - - - - - - - - - - - - - - -
 
+		# Loop through termList
 		for t in termList:
-		#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-		# Cycle through the termList then output list to assign importance to each term. Count each time
-		# the term appears in the list. The more it appears, the higher the count, and the higher the 
-		# importance. Needed to return a sorted list based on frequency.
-		#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
 
+			# Loop through output (set of terms) to add +1 for each time the term appears
 			for o in output:
-				if lower(t) == lower(o[0]):
+
+				# If the term is in the list, add +1
+				if t == o[0]:
 					output[index(o)][1] += 1
 
-		return sorted(output, key = lambda x: x[1], reverse = True)
-	
-	def save(self, name = "SampleLingGlenn-2000-PROCESSED", saveAs = "txt", delimiter = "\t", savePath = None):
-		"""	save the spreadsheet to a file. User can name the file and choose 
-			the type of file to save as (i.e., txt, csv, tsv, etc.)
+		return sorted(output, key=lambda tupleWithTermAndCount: tupleWithTermAndCount[1], reverse=True)
 
-			name		-->  indicate the name of the file to output the data
-			saveAs		-->  indicate the type of the file to output the data
-			delimiter	-->  indicate the type of delimiter to use for the data
-			savePath	-->  indicate the location where the save file should 
-							 be stored
-		"""
-
-		name = "{0}{1}".format(str(time.strftime("%y%m%d_%H%M_")), name)            # (1) Append date and time stamp to name
-		super(SpreadsheetSearch, self).save(name, saveAs, delimiter, savePath)      # (2) Save spreadsheet
-
-		return name
-	
-	def superFind(self, dice, termIndex = 4, sufficiency = "-I", fileType = 1):
-		"""	takes a list of prepared terms with respect to the DICE code and 
+	def superFind(self, dice, termIndex = 4):
+		"""	Takes a list of prepared terms with respect to the DICE code and 
 			searches for those DICE associated terms in the excerpts spread-
 			sheet. Users can analyze the resulting spreadsheet, which is tagged
 			for appearance of associated terms and where the associated term was
-			found - Left Column (Y- L), Right Column (Y - R), or Both (Y - LR).
+			found - Left Column (Y-L), Right Column (Y-R), or Both (Y-LR).
 
-			dice 		--> indicate the DICE code you are interested in com-
-							piling (e.g., CH001).
-			termIndex 	--> column in the spreadsheet (0-index) that contains
-							associated terms. default is 4, i.e., column E.
-			sufficiency --> indicate whether you want to compile associated 
-							terms belonging to insufficient "-I" or suffi-
-							cient "-S" terms.
+			@param	dice : DICE Code requested/to search for
+			@param	termIndex : location of the terms in Drools Rules
 
-			Returns a list of results from the find.
+			@return	list of results
 		"""
-		if self.spreadsheet_transposed:
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			# If the spreadsheet is transposed, revert it so that loops can work over rows rather than 
-			# columns. 3 is indicated to tranpose both spreadsheets.
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-			self.transpose(3)
-			
 		terms = self.prepareTerms(dice = dice, termIndex = termIndex)       # get associated terms list
-
-		self.results[0] = "Results"                                         # add heading for 'Results' column
-		self.indexes[0] = "Term Index"                                      # add heading for 'Term Index' column
-		self.matched[0] = "Matched Term"                                    # add heading for 'Matched Term' column
-		self.excerpt[0] = "Excerpt"                                         # add heading for 'Excerpt' column
 		
 		# CALL THESE JUST ONCE BEFORE LOOP(S)
-		toIndex = self.spreadsheet.index
-		extract = self.extract
+		getIndex = self.spreadsheet.index
+		#extract = self.extract
 		format  = str.format
 		join    = str.join
 		lower   = str.lower
 		upper   = str.upper
 		zfill   = str.zfill
-		# - - - - - - - - - - - - - - - - - -
 
-		for line in self.spreadsheet:
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-			# Cycle through each line, i.e., row in the spreadsheet for analysis.
-			#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
+		DICECodeRequested = dice
+		self.toRows()
 
-			index = toIndex(line)        # assign the numerical index to this line
+		#print DICECodeRequested
+		# Loop through rows/lines to analyze excerpts
+		#for line in self.spreadsheet:
+		for i in range(len(self.spreadsheet))[1:]:
+			#index = getIndex(line)        # assign the numerical index to this line
+			row = self.spreadsheet[i]
 
-			# CALL THESE JUST ONCE BEFORE LOOP(S)
-			#replace  = line.replace
-			#toIndexL = line.index 
-			# - - - - - - - - - - - - - - - - - -
+			#DICECode = format("CH{0}-", zfill(str(int(row[0])), 3)) <-- turn back on after testing
+			DICECode = row[0]
 
-			#print line
-
-			if index == 0:
-				pass
+			# If there is text in this cell
+			#if len(row[6]) > 0:
+			if len(row[0]) > 0:
+				DICECode = format("{0}", DICECode)
 			else:
-				if fileType == 1:
-					DICECode = format("CH{0}-", zfill(str(int(line[0])), 3))
-					if len(line[6]) > 0:
-						DICECode = format("{0}S", DICECode)
+				DICECode = format("{0}", DICECode)
+
+			# If the DICE Code in drools rules matches the requested DICE Code, continue analysis
+			if DICECode==DICECodeRequested:
+				#print DICECode, DICECodeRequested, DICECode==DICECodeRequested
+				indexLeft = termIndex-1
+				indexRight= termIndex+1
+
+				termFound = False
+
+				leadingText	= lower(row[indexLeft])
+				trailingText= lower(row[indexRight])
+
+				toIndexT = terms.index
+				#toIndexL = leadingText.index
+				#toIndexR = trailingText.index
+
+				# Loop through the prepared terms
+				for termTuple in terms:
+
+					term = termTuple[0]
+
+					# If the term is in both leading and trailing texts, assign "Y-LR",i.e., yes, left and right
+					if (term in leadingText) and (term in trailingText):
+						termFound = True
+						code = "Y-LR"
+
+					elif term in leadingText:
+						termFound = True
+						code = "Y-L"
+
+					elif term in trailingText:
+						termFound = True
+						code = "Y-R"
+
+					#print "termFound\t", termFound
+					if termFound == True:
+						#termTupleIndex = toIndexT(termTuple)
+						#line = lower(join(' ', row[indexLeft:indexRight+1])).replace("|","").replace("  ", " ")
+						spot = str(toIndexT(termTuple))
+						#extract = self.extract(line, spot)
+
+						#self.setCell(i, 10, code)
+						#self.setCell(i, 11, excerpt)
+						#self.setCell(i, 12, term)
+						#self.setCell(i, 13, str(spot))
+						#print code, '\t', extract[:50], '\t', "|", term
+						self.setCell(i, 5, code)
+						self.setCell(i, 6, spot)
+						self.setCell(i, 7, term)
+						#self.setCell(i, 8, extract)
+						break
 					else:
-						DICECode = format("{0}I", DICECode)
-				else:
-					DICECode = upper(line[0])
+						#print "\t\tDoing N"
+						#self.setCell(i,10, "N")
+						self.setCell(i, 5, "N")
+						#self.setCell(i, 6, "NA")
+						#self.setCell(i, 7, "NA")
 
+			#print "row", row
+		self.toColumns()
+		self.sort(0)
+		#print self.spreadsheet[5]
+		#print self.spreadsheet[6]
+		#print self.spreadsheet[7]
+		#print self.spreadsheet[8]
+		return self.spreadsheet[5]
 
-				if DICECode == dice + sufficiency:
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-					# If the DICE and sufficiency of this row match, then continue analysis. Otherwise, assign "NA",
-					# meaning "not applicable", for this row.
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
+if __name__=="__main__":
+	fileToAnalyze = u"M:\\DICE\\site - MaryWashington\\Extract2\\PHI\\samples\\mw2-ling-extracts.txt"
+	fileWithRules = u".\\files\\droolsrules.txt"
 
-					i = termIndex - 1
-					j = termIndex + 1
+	DICECodes = ["CH001", "CH002", "CH003", "CH004", "CH005", "CH006", "CH007", "CH008", "CH009", "CH010", \
+				 "CH011", "CH012", "CH013", "CH014", "CH015", "CH016", "CH017", "CH018", "CH019", "CH020", \
+				 "CH021", "CH022", "CH023", "CH024", "CH025", "CH026", "CH027", "CH028", "CH029", "CH030"]
 
-					left  = lower(line[i])                 
-					right = lower(line[j])  
+	# Used for testing
+	columns = [8,4,5,6,0]
 
-					termFound = False                       
-					
-					# CALL THESE JUST ONCE BEFORE LOOP(S)
-					toIndexT = terms.index
-					toIndexL = left.index
-					toIndexR = right.index
-					# - - - - - - - - - - - - - - - - - -
-
-					for term in terms:
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-					# Cycle through the terms.
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-						if (term[0] in left) and (term[0] in right):
-						#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-						# If the term is located in both left and right columns, assign "Y - LR" meaning "Yes - Left 
-						# and Right" to the results column.
-						#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-							self.results[index] = "Y - LR"
-							termFound = True
-							
-							#print "TERM", term, term[0] in left, line
-
-							line    = lower(join(' ', line[i:j+1])).replace("|","").replace("  ", " ")
-							spot    = toIndexL(term[0])
-							
-							self.excerpt[index] = extract(line, spot, upper = term[0]) # get the context extract for this row
-							self.matched[index] = term[0]
-							self.indexes[index] = str(toIndexT(term))
-							
-							break   # Terms found in both pre- and post-text already, break the loop and move on.
-
-						elif term[0] in left:
-						#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-						# If the term is located in the left column, assign "Y - L" meaning "Yes - Left" to the results
-						# column.
-						#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-							self.results[index] = "Y - L"
-							termFound = True
-							
-							line    = lower(join(' ', line[i:j+1])).replace("|","").replace("  ", " ")
-							spot    = toIndexL(term[0])
-							
-							self.excerpt[index] = extract(line, spot, upper = term[0]) # get the context extract for this row
-							self.matched[index] = term[0]
-							self.indexes[index] = str(toIndexT(term))
-
-							break   # Terms found in both pre- or post-text already, break the loop and move on.
-
-						elif term[0] in right:
-						#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-						# If the term is located in the right column, assign "Y - R" meaning "Yes - Right" to the results
-						# column.
-						#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-							self.results[index] = "Y - R"
-							termFound = True
-							
-							line    = lower(join(' ', line[i:j+1])).replace("|","").replace("  ", " ")
-							spot    = toIndexR(term[0])
-							
-							self.excerpt[index] = extract(line, spot, upper = term[0]) # get the context extract for this row
-							self.matched[index] = term[0]
-							self.indexes[index] = str(toIndexT(term))
-
-							break   # Terms found in both pre- or post-text already, break the loop and move on.
-
-					if termFound == False:
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-					# If the term was not found in this line, assign "N" to the results column.
-					#=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*#
-
-						self.results[index] = "N"
-
-		return self.results
+	SS = SpreadsheetSearch(fileToAnalyze, fileWithRules, columns, *DICECodes)
+	SS.superFind("CH001")
+	print SS.prepareForSave()

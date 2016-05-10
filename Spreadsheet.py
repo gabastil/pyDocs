@@ -107,11 +107,13 @@ class Spreadsheet(object):
 		self.spreadsheet.append(newColumn)
 		self.refresh()
 
-	def addToColumn(self, index=-1, content=None):
+	def addToColumn(self, column=-1, content=None):
 		"""	Fill a column with text
 			@param	content: content to insert
-			@param	index: column to fill
+			@param	column: column to fill (index or string)
 		"""
+		index = self.getColumnIndex(column)
+
 		self.toColumns()
 		self.spreadsheet[index].append(content)
 
@@ -198,7 +200,9 @@ class Spreadsheet(object):
 			@param	column:	column character (e.g., 'A') or column name
 			@return	integer index of column specified
 		"""
-		if len(column)==1:
+		if (type(column)==type(int())) or (type(column)==type(float())):
+			return int(column)
+		elif len(column)==1:
 			return self.COLUMN_ALPHA.index(column.upper())
 		else:
 			self.toRows()
@@ -465,7 +469,7 @@ if __name__=="__main__":
 	print "P:\t", p.spreadsheet
 
 	print p.prepareForSave()
-	print p.addToColumn(0,87)
+	print p.addToColumn("col1",87)
 	print p.addToColumn(0,55)
 	print p.addToColumn(0,785)
 	print p.addToColumn(1,3)
@@ -485,6 +489,7 @@ if __name__=="__main__":
 	p.removeColumn("booh")
 	print "Removed column:\t", p.spreadsheet
 	print p.getColumnIndex('A')
+	print p.getColumnIndex(00.0)
 	#print p.sort(3)
 	#print "P:\t", p.spreadsheet
 	#print p.sort(4, hasTitle=False)

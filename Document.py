@@ -67,16 +67,35 @@ class Document(object):
 		self.filePath = filePath
 		self.loaded   = True
 
-	def open(self, filePath=None):
+	def open(self, filePath=None, splitLines=False, splitTabs=False):
 		"""	opens an indicated text file for processing
 			@param	filePath: path of file to load.
 			@return	String of opened text file
 		"""
-		fileIn1 = open(filePath, 'r')
-		fileIn2 = fileIn1.read()
-		fileIn1.close()
+		with open(filePath, 'r') as fileIn1:
 
-		return fileIn2
+			readFile = fileIn1.read()
+
+			if splitLines==False and splitTabs==False:
+				return readFile
+
+			if splitLines==True and splitTabs==True:
+				return [line.split('\t') for line in readFile.splitlines()]
+
+			if splitLines==True:
+				return readFile.splitlines()
+
+			if splitTabs==True:
+				return readFile.split('\t')
+
+		#fileIn1 = open(filePath, 'r')
+		#fileIn2 = fileIn1.read()
+		#fileIn1.close()
+
+		#if splitLines==True:
+		#	return fileIn2.split('\n')
+
+		#return fileIn2
 
 	def save(self, savePath=None, saveContent=None, saveType='w'):
 		"""	write content out to a file
