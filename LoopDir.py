@@ -131,6 +131,7 @@ class LoopDir(object):
 		# If False, apply function to folders. Otherwise, apply function to files.
 		if actOnFiles == False:
 			isGood = os.path.isdir
+			
 		else:
 			isGood = os.path.isfile
 

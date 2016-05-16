@@ -194,7 +194,7 @@ class SpreadsheetPlus(Spreadsheet):
 		elif sheet == 2:
 			saveContent = self.prepareForSave(self.spreadsheetPlus)
 		
-		super(spreadsheetPlus, self).save(savePath=savePath, saveContent=self.spreadsheet, saveType=saveType)
+		super(SpreadsheetPlus, self).save(savePath=savePath, saveContent=self.spreadsheet, saveType=saveType)
 
 if __name__=="__main__":
 
