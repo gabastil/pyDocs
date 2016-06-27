@@ -44,7 +44,7 @@ __status__      = "Deployed"
 
 class Spreadsheet(object):
 
-	def __init__(self, filePath=None, savePath=None, columns=["columnName"]):
+	def __init__(self, filePath=None, savePath=None, delimiter="\t", columns=["columnName"]):
 		"""	Initialize an instance of this class
 			@param  filePath: path of the spreadsheet file to be loaded
 			@param	savePath: write to this location
@@ -62,7 +62,7 @@ class Spreadsheet(object):
 		self.iter_index	 = 0			# Used for next() function
 
 		if filePath is not None:
-			self.initialize(filePath)
+			self.initialize(filePath, delimiter)
 		else:
 			self.spreadsheet.extend([columns])
 
@@ -73,6 +73,13 @@ class Spreadsheet(object):
 			@param  key: index number of item.
 		"""
 		return self.spreadsheet[key]
+
+	def __setitem__(self, i, item):
+		"""	Enable list[n] = item assignment
+			@param	i: index of item to replace
+			@param	item: new item to assign
+		"""
+		self.spreadsheet[i] = item
 
 	def __iter__(self):
 		"""	Enable iteration of this class
@@ -109,13 +116,36 @@ class Spreadsheet(object):
 
 	def addToColumn(self, column=-1, content=None):
 		"""	Fill a column with text
-			@param	content: content to insert
 			@param	column: column to fill (index or string)
+			@param	content: content to insert
 		"""
 		index = self.getColumnIndex(column)
 
 		self.toColumns()
 		self.spreadsheet[index].append(content)
+
+	def addRow(self, newRow=None):
+		""" Add a row to the spreadsheet
+			@param	newRow: (list) row to add
+		"""
+		# If newRow is none, raise an error
+		if newRow is None:
+			raise ValueError("Please specify a new row list to add to the spreadsheet. E.g., Spreadsheet.addRow(rowAsList)")
+
+		# Transpose spreadsheet to edit row
+		self.toRows()
+		self.spreadsheet.append(newRow)
+		self.refresh()
+
+	def addToRow(self, row=-1, content=None):
+		"""	append or extend data to a row
+			@param	row:	 index of row to add data to
+			@param	content: content to insert
+		"""
+		if type(content)==type(list()):
+			self.spreadsheet[row].extend(content)
+		else:
+			self.spreadsheet[row].append(content)
 
 	def fillColumn(self, column=-1, fillWith=" ", skipTitle=True, cellList=None):
 		"""	Fill a column with text
@@ -195,6 +225,26 @@ class Spreadsheet(object):
 
 		self.spreadsheet[column] = newColumn
 
+	def getColumn(self, column, number=False, header=False):
+		"""	get column at specified index
+			@param	column: index or name of desired column
+			@param	number: return floats of numbers in column
+			@param	header: include column header
+			@return	list of column
+		"""
+		self.toColumns()
+
+		if number==True:
+			#print self.spreadsheet[self.getColumnIndex(column)][1:]
+			column = [self.spreadsheet[0]] + [float(row) for row in self.spreadsheet[self.getColumnIndex(column)][1:] if row != '']
+		else:
+			column = self.spreadsheet[self.getColumnIndex(column)]
+
+		if header==False:
+			return column[1:]
+
+		return column
+
 	def getColumnIndex(self, column):
 		"""	get the numerical index for a column
 			@param	column:	column character (e.g., 'A') or column name
@@ -210,11 +260,40 @@ class Spreadsheet(object):
 			self.toColumns()
 			return columnIndex
 
+	def getColumnName(self, column):
+		"""	get the name of specified column
+			@param	column:	column character (e.g., 'A') or column name
+			@return	string name of column
+		"""
+		index = self.getColumnIndex(column)
+		return self.getColumn(column=column, header=True)[0]
+
 	def getFilePath(self):
 		"""	Get the file path
 			@return	String of the file path
 		"""
 		return self.filePath
+
+	def getRow(self, index):
+		"""	get row at specified index
+			@param	index: index for desired row
+			@return	list of row
+		"""
+		self.toRows()
+		return self.spreadsheet[index+1]
+
+	def getRowIndex(self, content):
+		""" get the index of a specified row
+			@param	content:	cell content whose row to get
+			@return	integer index or None
+		"""
+		self.toRows()
+
+		for row in self.spreadsheet:
+			if content in row:
+				return self.spreadsheet.index(row)
+
+		return None
 
 	def getSavePath(self):
 		"""	Get the save path
@@ -264,7 +343,7 @@ class Spreadsheet(object):
 		fileIn1.close()
 		return fileIn2
 
-	def prepareForSave(self, spreadsheet=None):
+	def prepareForSave(self, spreadsheet=None, delimiter="\t"):
 		"""	Prepare the spreadsheet for saving
 			@param	spreadsheet: list of rows/columns to prepare
 			@return	String of spreadsheet in normal form (e.g., not transposed)
@@ -278,7 +357,8 @@ class Spreadsheet(object):
 		append	= rowList.append
 
 		for row in spreadsheet:
-			append("\t".join(row))
+			row = [str(item) for item in row]
+			append(delimiter.join(row))
 
 		saveContent = "\n".join(rowList)
 
@@ -326,20 +406,34 @@ class Spreadsheet(object):
 
 		self.iter_index	 = 0		# Used for next() function
 
-	def save(self, savePath=None, saveContent=None, saveType='w'):
+	def save(self, savePath=None, saveContent=None, saveType='w', delimiter="\t"):
 		"""	Write content out to a file
 			@param	savePath: name of the file to be saved
 			@param	saveContent: list of rows/columns to be saved
 			@param	saveType: indicate overwrite ('w') or append ('a')
 		"""
 		if saveContent is None:
-			saveContent = self.prepareForSave()
+			saveContent = self.prepareForSave(delimiter=delimiter)
 		else:
-			saveContent = self.prepareForSave(saveContent)
+			saveContent = self.prepareForSave(spreadsheet=saveContent, delimiter=delimiter)
 
 		saveFile = open(savePath, saveType)
 		saveFile.write(saveContent)
 		saveFile.close()
+
+	def setColumn(self, column, newColumnCells, newHeader=False):
+		"""	set a column to a new list of values
+			@param	column: index or name of column
+			@param	newColumnCells: list of new column values
+		"""
+		self.toColumns()
+		if len(self.spreadsheet[self.getColumnIndex(column)]) <= 1:
+			self.spreadsheet[self.getColumnIndex(column)].extend(newColumnCells)
+		else:
+			if newHeader == True:
+				self.spreadsheet[self.getColumnIndex(column)] = newColumnCells
+			else:
+				self.spreadsheet[self.getColumnIndex(column)] = [self.spreadsheet[self.getColumnIndex(column)][0]]+newColumnCells
 
 	def setCell(self, row, column, content):
 		""" Set a cell to content

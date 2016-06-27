@@ -67,7 +67,7 @@ class Document(object):
 		self.filePath = filePath
 		self.loaded   = True
 
-	def open(self, filePath=None, splitLines=False, splitTabs=False):
+	def open(self, filePath=None, splitLines=False, splitTabs=False, splitBy="\t"):
 		"""	opens an indicated text file for processing
 			@param	filePath: path of file to load.
 			@return	String of opened text file
@@ -80,13 +80,13 @@ class Document(object):
 				return readFile
 
 			if splitLines==True and splitTabs==True:
-				return [line.split('\t') for line in readFile.splitlines()]
+				return [line.split(splitBy) for line in readFile.splitlines()]
 
 			if splitLines==True:
 				return readFile.splitlines()
 
 			if splitTabs==True:
-				return readFile.split('\t')
+				return readFile.split(splitBy)
 
 		#fileIn1 = open(filePath, 'r')
 		#fileIn2 = fileIn1.read()
