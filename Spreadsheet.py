@@ -250,12 +250,22 @@ class Spreadsheet(object):
 			@param	column:	column character (e.g., 'A') or column name
 			@return	integer index of column specified
 		"""
+
+
+		# If 'column' is a number type, return the integer of that number
 		if (type(column)==type(int())) or (type(column)==type(float())):
 			return int(column)
+
+		# If 'column' is a single character, return it's index
 		elif len(column)==1:
 			return self.COLUMN_ALPHA.index(column.upper())
+
+		# If 'column' is a string, return it's index
 		else:
 			self.toRows()
+			#print self.spreadsheet[0]
+			#print self.spreadsheet[1]
+			#print self.spreadsheet[2]
 			columnIndex = self.spreadsheet[0].index(column)
 			self.toColumns()
 			return columnIndex
@@ -273,6 +283,11 @@ class Spreadsheet(object):
 			@return	String of the file path
 		"""
 		return self.filePath
+
+	def getHeaders(self):
+		""" return headers for columns in the spreadsheet """
+		self.toColumns()
+		return [column[0] for column in self.spreadsheet]
 
 	def getRow(self, index):
 		"""	get row at specified index
@@ -318,6 +333,10 @@ class Spreadsheet(object):
 
 		self.filePath 	 = filePath
 		self.loaded 	 = True
+		self.toRows()
+
+		if self.spreadsheet[0][0]=="columnName":
+			del(self.spreadsheet[0])
 
 	def newColumn(self, name=" ", fillWith=" "):
 		"""	Add a new (empty) column to the spreadsheet
@@ -385,9 +404,19 @@ class Spreadsheet(object):
 		"""	remove a column in self.spreadsheet
 			@param	column: index or string indicating column to remove
 		"""
+		self.toColumns()
+
 		# if column variable is a string (i.e., column name), get column with the same name's index	
 		if type(column) == type(str()):
 			column = self.getColumnIndex(column)
+
+		del self.spreadsheet[column]
+
+	def removeRow(self, row=-1):
+		"""	remove a row in self.spreadsheet
+			@param	row: index of row to remove
+		"""
+		self.toRows()
 
 		del self.spreadsheet[column]
 
@@ -442,6 +471,12 @@ class Spreadsheet(object):
 		self.toRows()
 		self.spreadsheet[row][column]=content
 
+	def setData(self, data):
+		""" set spreadsheet to new data
+			@param	data: user specified spreadsheet data
+		"""
+		self.spreadsheet = data
+
 	def setFilePath(self, filePath):
 		"""	Set this object to a new file
 			@param	filePath: location to new file
@@ -458,8 +493,12 @@ class Spreadsheet(object):
 		""" Sort spreadsheet based on column
 			@param	column: column to sort by
 			@param	reverse: reverse sort
+			@param	hasTitle: if True, sort spreadsheet from second row (i==1)
 		"""
 		self.toRows()
+		
+		column = self.getColumnIndex(column)
+
 		if hasTitle == True:
 			header = self.spreadsheet[0]
 			body = sorted(self.spreadsheet[1:], key=lambda row:row[column], reverse=reverse)
