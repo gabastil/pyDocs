@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Name:     Spreadsheet.py
-# Version:  1.0.0
+# Version:  1.0.1
 # Author:   Glenn Abastillas
 # Date:     August 21, 2015
 #
@@ -23,6 +23,7 @@
 # 4. [2016/03/07] - removed unused method - def determineGroupByRange(self, columnToBeDetermined = 0, rangeToBeDetermined = 0)
 # 5. [2016/04/18] - added: addColumn(), newColumn() and fillColumn() methods
 # 5. [2016/04/21] - added: addColumn(), newColumn() and fillColumn() methods
+# 5. [2016/06/27] - Changed version number to 1.0.1
 # - - - - - - - - - - - - -
 """	Creates a manipulable spreadsheet object from a text file.
 
@@ -30,6 +31,9 @@ The Spreadsheet class is used to represent text files as objects for further
 use by other classes. This is a base class and does not inherit from other
 classes. Two methods exist in this class that can be used as static methods:
 (1) open(doc): open a specified document and (2) save().
+
+The Spreadsheet class allows for manipulation of a matrix stored as a list of
+lists. Rows and columns can be added, removed, edited or extracted (copied).
 
 """
 __author__      = "Glenn Abastillas"
@@ -115,7 +119,7 @@ class Spreadsheet(object):
 		self.refresh()
 
 	def addToColumn(self, column=-1, content=None):
-		"""	Fill a column with text
+		"""	Append a new value to the specified column
 			@param	column: column to fill (index or string)
 			@param	content: content to insert
 		"""
@@ -324,13 +328,29 @@ class Spreadsheet(object):
 			@param	name: name of column
 			@param	fillWith: contents of new column
 		"""
-		# Transpose spreadsheet to edit column
-		self.toColumns()
-
+		# Add a new column filled with the indicated values
 		newColumn 	 = [fillWith] * len(self.spreadsheet[0])
 		newColumn[0] = name
 
+		# Transpose spreadsheet to edit columns
+		self.toColumns()
 		self.spreadsheet.append(newColumn)
+		self.refresh()
+
+	def newRow(self, *values):
+		""" Add a new row to the spreadsheet
+			@param	*values: a list of values to add to the spreadsheet
+		"""
+		# If there are no values specified, add an empty row; else, add the values specified
+		if len(values)==0:
+			longestRow = len(max(self.spreadsheet, key=len))
+			newRow = [""] * longestRow
+		else:
+			newRow = values
+
+		# Transpose spreadsheet to edit rows
+		self.toRows()
+		self.spreadsheet.append(newRow)
 		self.refresh()
 
 	def open(self, filePath):
@@ -536,8 +556,7 @@ class Spreadsheet(object):
 
 if __name__=="__main__":
 
-	#d = Spreadsheet("../files/debridementSamples.txt")
-	d = Spreadsheet("../files/test.txt")
+	d = Spreadsheet("../../resources/test.txt")
 	print d.getSpreadsheet()
 	d.transpose()
 	print d.getSpreadsheet()
