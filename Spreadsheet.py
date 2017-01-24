@@ -38,7 +38,8 @@
 # 8a.[2017/01/20] - added __repr__() class.
 # 9. [2017/01/24] - collapsed setters and getters for cell(), row(), column()
 # 9a.[2017/01/24] - changed fillColumn() to fill(), initialize() to load()
-# 9b.[2017/01/24] - collapsed setters and getters for savePath(), 
+# 9b.[2017/01/24] - collapsed setters and getters for savePath() and filePath()
+# 9c.[2017/01/24] - updated load() method
 # - - - - - - - - - - - - -
 """ Creates a manipulable spreadsheet object from a text file.
 
@@ -159,40 +160,43 @@ class Spreadsheet(object):
             self.__iter_index = 0
             raise StopIteration
 
-    def addToColumn(self, column=-1, content=None):
-        """ Fill a column with text
-            @param  column: column to fill (index or string)
-            @param  content: content to insert
+    def addToColumn(self, column=-1, data=None):
+        """ 
+            Fill a column with text
+            
+            Attributes:
+                column (int): column to fill (index or string)
+                data (str, int): data to insert
         """
         index = self.getColumnIndex(column)
 
         self.toColumns()
-        self.__spreadsheet[index].append(content)
+        self.__spreadsheet[index].append(data)
 
-    def addToRow(self, row=-1, content=None):
+    def addToRow(self, row=-1, data=None):
         """ append or extend data to a row
             @param  row:     index of row to add data to
-            @param  content: content to insert
+            @param  data: data to insert
         """
-        if type(content)==type(list()):
-            self.__spreadsheet[row].extend(content)
+        if type(data)==type(list()):
+            self.__spreadsheet[row].extend(data)
         else:
-            self.__spreadsheet[row].append(content)
+            self.__spreadsheet[row].append(data)
 
-    def cell(self, row, column, content=None):
+    def cell(self, row, column, data=None):
         """
             Get or set value at specified cell
 
             Attributes:
                 row (int): index of cell row
                 column (int): index of cell column
-                content (str): content to fill cell
+                data (str): data to fill cell
         """
-        if content is None:
+        if data is None:
             return self.getRow(row)[column]
         else:
             self.toRows()
-            self.__spreadsheet[row][column] = content
+            self.__spreadsheet[row][column] = data
 
     def column(self, column=0, data=None, number=False, header=False):
         """
@@ -295,7 +299,7 @@ class Spreadsheet(object):
 
             Attributes:
                 column (int): column to fill (index or column name)
-                fillWith (str): contents of new column
+                fillWith (str): datas of new column
                 cellList (array): list of tuples (cell, offset) to
                                   insert into the fillWith formula
                 skipTitle (bool): start filling on the second row
@@ -329,7 +333,7 @@ class Spreadsheet(object):
             cellListLength = len(cellList)
             columnForLoop = len(self.__spreadsheet[column])
 
-            # loop through the rows in the spreadsheet to fill content
+            # loop through the rows in the spreadsheet to fill data
             for i in xrange(initialIndex, columnForLoop):
 
                 fillWithToReplace = fillWith
@@ -349,7 +353,7 @@ class Spreadsheet(object):
                     else:
                         referenceValue = str(i + cellListValue)
 
-                    # reference cell to insert into the fillWith content
+                    # reference cell to insert into the fillWith data
                     reference = cellList[j][0].replace("{0}", referenceValue)
 
                     # marker indicates where the reference should go
@@ -365,12 +369,12 @@ class Spreadsheet(object):
 
                 append(fillWithToReplace)
 
-        # if there is no cellList, just fill all cells with the same content
+        # if there is no cellList, just fill all cells with the same data
         else:
 
             columnForLoop = self.__spreadsheet[column][initialIndex:]
 
-            # loop through the rows in the spreadsheet to fill content
+            # loop through the rows in the spreadsheet to fill data
             for row in columnForLoop:
                 append(fillWith)
 
@@ -426,21 +430,21 @@ class Spreadsheet(object):
         self.toRows()
         return len(self.__spreadsheet)-1
 
-    def getRowIndex(self, content):
+    def getRowIndex(self, data):
         """
             Get the index of a specified row
 
             Attributes:
-                content (str):    cell content whose row to get
+                data (str):    cell data whose row to get
 
             Returns:
                 int: index of row
-                None: if content does not match row[0]
+                None: if data does not match row[0]
         """
         self.toRows()
 
         for row in self.__spreadsheet:
-            if content in row[0]:
+            if data in row[0]:
                 return self.__spreadsheet.index(row)
 
         return None
@@ -448,7 +452,7 @@ class Spreadsheet(object):
     def getSpreadsheet(self):
         """
             Get this Spreadsheet
-            @return List of rows and columns with content
+            @return List of rows and columns with data
         """
         return self.__spreadsheet
 
@@ -488,7 +492,7 @@ class Spreadsheet(object):
 
             Attributes:
                 name (str): name of column
-                fillWith (str): contents of new column
+                fillWith (str): datas of new column
         """
         # Transpose spreadsheet to edit column
         self.toColumns()
@@ -533,9 +537,9 @@ class Spreadsheet(object):
             row = [str(item) for item in row]
             append(delimiter.join(row))
 
-        saveContent = "\n".join(rowList)
+        savedata = "\n".join(rowList)
 
-        return saveContent
+        return savedata
 
     def refresh(self):
         """ 
@@ -628,21 +632,21 @@ class Spreadsheet(object):
             self.__spreadsheet.append(newRow)
             self.refresh()
 
-    def save(self, savePath=None, saveContent=None,
+    def save(self, savePath=None, savedata=None,
              saveType='w', delimiter="\t"):
-        """ Write content out to a file
+        """ Write data out to a file
             @param  savePath: name of the file to be saved
-            @param  saveContent: list of rows/columns to be saved
+            @param  savedata: list of rows/columns to be saved
             @param  saveType: indicate overwrite ('w') or append ('a')
         """
-        if saveContent is None:
-            saveContent = self.prepareForSave(delimiter=delimiter)
+        if savedata is None:
+            savedata = self.prepareForSave(delimiter=delimiter)
         else:
-            saveContent = self.prepareForSave(spreadsheet=saveContent,
+            savedata = self.prepareForSave(spreadsheet=savedata,
                                               delimiter=delimiter)
 
         saveFile = open(savePath, saveType)
-        saveFile.write(saveContent)
+        saveFile.write(savedata)
         saveFile.close()
 
     def setData(self, data):
