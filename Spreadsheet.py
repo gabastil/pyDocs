@@ -36,7 +36,9 @@
 # 8. [2017/01/20] - reformatted entire class according to PEP guidelines.
 #                   Class notes to be completed at a later time.
 # 8a.[2017/01/20] - added __repr__() class.
-# 9. [2017/01/24] - collapsed setters and getters for cell(), row().
+# 9. [2017/01/24] - collapsed setters and getters for cell(), row(), column()
+# 9a.[2017/01/24] - changed fillColumn() to fill(), initialize() to load()
+# 9b.[2017/01/24] - collapsed setters and getters for savePath(), 
 # - - - - - - - - - - - - -
 """ Creates a manipulable spreadsheet object from a text file.
 
@@ -63,11 +65,9 @@ class Spreadsheet(object):
         lated, i.e., searched, rows/columns edited, and saved.
 
         User Accesible Methods:
-            addColumn():
             addToColumn():
-            addRow():
             addToRow():
-            fillColumn():
+            fill():
     """
 
     COLUMN_ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -85,30 +85,31 @@ class Spreadsheet(object):
         """
 
         # list containing spreadsheet
-        self.spreadsheet = list()
+        self.__spreadsheet = list()
 
         # location of the spreadsheet
-        self.filePath = filePath
+        self.__filePath = filePath
 
         # save location for spreadsheet
-        self.savePath = savePath
+        self.__savePath = savePath
 
         # spreadsheet loaded?
-        self.loaded = False
+        self.__loaded = False
 
         # spreadsheet initialized?
-        self.initialized = False
+        self.__initialized = False
 
         # spreadsheet as rows (False) or columns (True)
-        self.transposed = False
+        self.__transposed = False
 
         # Used for next() function
-        self.iter_index = 0
+        self.__iter_index = 0
 
+        # Load filePath if one is specified
         if filePath is not None:
-            self.initialize(filePath, delimiter)
+            self.load(filePath, delimiter)
         else:
-            self.spreadsheet.extend([columns])
+            self.__spreadsheet.extend([columns])
 
     def __getitem__(self, key):
         """
@@ -117,7 +118,7 @@ class Spreadsheet(object):
             Attributes:
                 key (int): index number of item.
         """
-        return self.spreadsheet[key]
+        return self.__spreadsheet[key]
 
     def __setitem__(self, i, item):
         """
@@ -127,7 +128,7 @@ class Spreadsheet(object):
                 i (int): index of item to replace
                 item (obj): new item to assign
         """
-        self.spreadsheet[i] = item
+        self.__spreadsheet[i] = item
 
     def __iter__(self):
         """
@@ -139,37 +140,69 @@ class Spreadsheet(object):
         """
             Returns number of items in spreadsheet
         """
-        return len(self.spreadsheet)
+        return len(self.__spreadsheet)
 
     def __repr__(self):
         """
             Formats the string representation of this object
         """
-        rows_as_str = ('\t'.join(str(cell) for cell in row)
-                       for row in self.spreadsheet)
-
-        return '\n'.join(rows_as_str)
+        return self.toString()
 
     def next(self):
         """
             Get next item in iteration
         """
         try:
-            self.iter_index += 1
-            return self.spreadsheet[self.iter_index - 1]
+            self.__iter_index += 1
+            return self.__spreadsheet[self.__iter_index - 1]
         except(IndexError):
-            self.iter_index = 0
+            self.__iter_index = 0
             raise StopIteration
 
-    # --> Changed from addColumn() to just column()
-    # --> Removed getColumn() method
-    def column(self, column=0, number=False, header=False):
+    def addToColumn(self, column=-1, content=None):
+        """ Fill a column with text
+            @param  column: column to fill (index or string)
+            @param  content: content to insert
         """
-            Get column at specified index or add column if column is a list
+        index = self.getColumnIndex(column)
+
+        self.toColumns()
+        self.__spreadsheet[index].append(content)
+
+    def addToRow(self, row=-1, content=None):
+        """ append or extend data to a row
+            @param  row:     index of row to add data to
+            @param  content: content to insert
+        """
+        if type(content)==type(list()):
+            self.__spreadsheet[row].extend(content)
+        else:
+            self.__spreadsheet[row].append(content)
+
+    def cell(self, row, column, content=None):
+        """
+            Get or set value at specified cell
+
+            Attributes:
+                row (int): index of cell row
+                column (int): index of cell column
+                content (str): content to fill cell
+        """
+        if content is None:
+            return self.getRow(row)[column]
+        else:
+            self.toRows()
+            self.__spreadsheet[row][column] = content
+
+    def column(self, column=0, data=None, number=False, header=False):
+        """
+            Get column at specified index, add column if column is a list
+            or replace column
 
             Attributes:
                 column (int): index for desired column
                 column (list): column to add
+                data (list): new data to replace column at specified index
                 number (bool): convert list elements to numbers if True
                 header (bool): include header in list returned if True
 
@@ -181,33 +214,55 @@ class Spreadsheet(object):
         self.toColumns()
 
         # If column parameter is an integer, retrieve column at that integer index
-        if isinstance(column, int):
+        if isinstance(column, int) or isinstance(column, str):
 
-            # Get the index of specified column - method used in case input
+            # Get the index of specified column - method used in case input 
             # is string
             index = self.getColumnIndex(column)
 
             # Get base column
-            column = self.spreadsheet[index]
-            
+            column = self.__spreadsheet[index]
+                
             # Separate base column into head and body
             column_head = [column[0]]
             column_body = column[1:]
 
-            if number is True:
-                body = [float(row) for row in column_body[1:] if row != '']
+            # If there is data to set column, replace column with new data
+            if isinstance(data, list):
 
-                column = column_head + body
+                # If header is True, replace old header
+                if header:
+                    new_column = data
 
-            if header is False:
-               return column_body
+                # If header is False, keep old header
+                else:
+                    new_column = column_head + data
 
-            return column
+                self.__spreadsheet[index] = new_column
+                self.refresh()
 
-        # If column parameter is a list, add column to self.spreadsheet
+            else:
+
+                # Convert cell values to numbers
+                if number is True:
+                    body = [float(row) for row in column_body[1:] if row != '']
+
+                    column = column_head + body
+
+                    # Return column with converted values without header
+                    if not header:
+                        return body
+
+                # Return the column without the header
+                if not header:
+                   return column_body
+
+                return column
+
+        # If column parameter is a list, add column to self.__spreadsheet
         elif isinstance(column, list):
 
-            self.spreadsheet.append(column)
+            self.__spreadsheet.append(column)
             self.refresh()
 
         # If newColumn is none, raise an error
@@ -216,27 +271,24 @@ class Spreadsheet(object):
                              "to add to the spreadsheet. E.g.," +
                              "Spreadsheet.addColumn(columnAsList)")
 
-    def addToColumn(self, column=-1, content=None):
-        """ Fill a column with text
-            @param  column: column to fill (index or string)
-            @param  content: content to insert
+    def filePath(self, filePath=None, delimiter="\t"):
         """
-        index = self.getColumnIndex(column)
+            Sets or gets the file path
 
-        self.toColumns()
-        self.spreadsheet[index].append(content)
+            Attributes:
+                filePath (str): path to load for this Spreadsheet
+                delimiter (str): delimiter of document at filePath
 
-    def addToRow(self, row=-1, content=None):
-        """ append or extend data to a row
-            @param  row:     index of row to add data to
-            @param  content: content to insert
+            Returns:
+                str: file path of this Spreadsheet
         """
-        if type(content)==type(list()):
-            self.spreadsheet[row].extend(content)
+
+        if filePath is None:
+            return self.__filePath
         else:
-            self.spreadsheet[row].append(content)
+            self.load(filePath, delimiter)
 
-    def fillColumn(self, column=-1, fillWith=" ",
+    def fill(self, column=-1, fillWith=" ",
                    skipTitle=True, cellList=None):
         """
             Fills a column with text
@@ -262,7 +314,7 @@ class Spreadsheet(object):
 
         # if skipTitle is True, start loop at index 1 not 0
         if skipTitle is True:
-            append(self.spreadsheet[column][0])
+            append(self.__spreadsheet[column][0])
             initialIndex = 1
 
         # if there is a a cellList, there are values to replace
@@ -275,10 +327,10 @@ class Spreadsheet(object):
             #               ["$A2", "$C$0"] at i-index == 1 in the loop
 
             cellListLength = len(cellList)
-            columnForLoop = len(self.spreadsheet[column])
+            columnForLoop = len(self.__spreadsheet[column])
 
             # loop through the rows in the spreadsheet to fill content
-            for i in range(columnForLoop)[initialIndex:]:
+            for i in xrange(initialIndex, columnForLoop):
 
                 fillWithToReplace = fillWith
 
@@ -316,43 +368,29 @@ class Spreadsheet(object):
         # if there is no cellList, just fill all cells with the same content
         else:
 
-            columnForLoop = self.spreadsheet[column][initialIndex:]
+            columnForLoop = self.__spreadsheet[column][initialIndex:]
 
             # loop through the rows in the spreadsheet to fill content
             for row in columnForLoop:
                 append(fillWith)
 
-        self.spreadsheet[column] = newColumn
-
-    # --> Changed from getCell() to just cell()
-    # --> Removed setCell() method
-    def cell(self, row, column, content=None):
-        """
-            Get or set value at specified cell
-
-            Attributes:
-                row (int): index of cell row
-                column (int): index of cell column
-                content (str): content to fill cell
-        """
-        if content is None:
-            return self.getRow(row)[column]
-        else:
-            self.toRows()
-            self.spreadsheet[row][column] = content
+        self.__spreadsheet[column] = newColumn
 
     def getColumnCount(self):
         """ Return number of columns in spreadsheet data """
         self.toColumns()
-        return len(self.spreadsheet)
+        return len(self.__spreadsheet)
 
     def getColumnIndex(self, column):
         """
             Get the numerical index for a column
-            @param  column: column character (e.g., 'A') or column name
-            @return integer index of column specified
-        """
 
+            Attributes:
+                column (str, int): column character (e.g., 'A') or column name
+
+            Returns:
+                int: index of column specified
+        """
 
         # If 'column' is a number type, return the integer of that number
         if (type(column)==type(int())) or (type(column)==type(float())):
@@ -365,7 +403,7 @@ class Spreadsheet(object):
         # If 'column' is a string, return it's index
         else:
             self.toRows()
-            columnIndex = self.spreadsheet[0].index(column)
+            columnIndex = self.__spreadsheet[0].index(column)
             self.toColumns()
             return columnIndex
 
@@ -378,98 +416,71 @@ class Spreadsheet(object):
         index = self.getColumnIndex(column)
         return self.getColumn(column=column, header=True)[0]
 
-    def getFilePath(self):
-        """
-            Get the file path
-            @return String of the file path
-        """
-        return self.filePath
-
     def getHeaders(self):
         """ return headers for columns in the spreadsheet """
         self.toColumns()
-        return [column[0] for column in self.spreadsheet]
-
-    # --> Changed from getRow() to just row()
-    # --> Removed addRow() method
-    def row(self, row=0):
-        """
-            Get row at specified index or add row if row is a list
-
-            Attributes:
-                row (int): index for desired row
-                row (list): row to add
-
-            Returns:
-                list: row elements
-        """
-
-        # If row is an integer, get row at that index
-        if isinstance(row, int):
-            self.toRows()
-            return self.spreadsheet[index+1]
-
-        elif isinstance(row, list):
-
-            # If row is none, raise an error
-            if row is None:
-                raise ValueError("Please specify a new row list" +
-                                 "to add to the spreadsheet. E.g.," +
-                                 " Spreadsheet.row(rowAsList)")
-
-            # Transpose spreadsheet to edit row
-            self.toRows()
-            self.spreadsheet.append(newRow)
-            self.refresh()
+        return [column[0] for column in self.__spreadsheet]
 
     def getRowCount(self):
         """ Return number of rows in spreadsheet data """
         self.toRows()
-        return len(self.spreadsheet)-1
+        return len(self.__spreadsheet)-1
 
     def getRowIndex(self, content):
         """
             Get the index of a specified row
-            @param  content:    cell content whose row to get
-            @return integer index or None
+
+            Attributes:
+                content (str):    cell content whose row to get
+
+            Returns:
+                int: index of row
+                None: if content does not match row[0]
         """
         self.toRows()
 
-        for row in self.spreadsheet:
-            if content in row:
-                return self.spreadsheet.index(row)
+        for row in self.__spreadsheet:
+            if content in row[0]:
+                return self.__spreadsheet.index(row)
 
         return None
-
-    def getSavePath(self):
-        """
-            Get the save path
-            @return String of the save path
-        """
-        return self.savePath
 
     def getSpreadsheet(self):
         """
             Get this Spreadsheet
             @return List of rows and columns with content
         """
-        return self.spreadsheet
+        return self.__spreadsheet
 
-    def initialize(self, filePath=None, sep="\t"):
-        """ Open the file and parse out rows and columns
-            @param  filePath: spreadsheet file to load into memory
+    def load(self, filePath=None, delimiter="\t"):
+        """ 
+            Open the file and parse out rows and columns
+            
+            Attributes:
+                filePath (str): spreadsheet file to load into memory
+                delimiter (str): delimiter of document at filePath
+        
+            Raises:
+                ValueError: if filePath is not specified
         """
+        if filePath is None:
+            raise ValueError("Please enter a file path for this method's" + \
+                             " filePath parameter")
+
         openedFilePath = self.open(filePath).splitlines()
 
         for line in openedFilePath:
-            self.spreadsheet.append(line.split(sep))
+            self.__spreadsheet.append(line.split(delimiter))
 
-        self.filePath = filePath
-        self.loaded = True
+        self.__filePath = filePath
+        self.__loaded = True
         self.toRows()
 
-        if self.spreadsheet[0][0] == "columnName":
-            del(self.spreadsheet[0])
+        first_row = self.__spreadsheet[0]
+
+        if not self.__initialized:
+            del(self.__spreadsheet[0])
+            self.__initialized = True
 
     def newColumn(self, name=" ", fillWith=" "):
         """
@@ -482,10 +493,12 @@ class Spreadsheet(object):
         # Transpose spreadsheet to edit column
         self.toColumns()
 
-        newColumn = [fillWith] * len(self.spreadsheet[0])
+        length = len(self.__spreadsheet[0])
+
+        newColumn = [fillWith for row in xrange(length)]
         newColumn[0] = name
 
-        self.spreadsheet.append(newColumn)
+        self.__spreadsheet.append(newColumn)
         self.refresh()
 
     def open(self, filePath):
@@ -493,7 +506,7 @@ class Spreadsheet(object):
             @param  filePath: path of file to load
             @return String of opened text file
         """
-        fileIn1 = open(filePath, 'r')
+        fileIn1 = open(filePath, mode='rUb', buffering=2)
         fileIn2 = fileIn1.read()
         fileIn1.close()
         return fileIn2
@@ -511,7 +524,7 @@ class Spreadsheet(object):
         # Use this instance's spreadsheet if none specified
         if spreadsheet is None:
             self.toRows()
-            spreadsheet = self.spreadsheet
+            spreadsheet = self.__spreadsheet
 
         rowList = list()
         append = rowList.append
@@ -525,11 +538,12 @@ class Spreadsheet(object):
         return saveContent
 
     def refresh(self):
-        """ Make sure all columns/rows are the same length
+        """ 
+            Make sure all columns/rows are the same length
         """
         self.transpose()
         self.transpose()
-        self.initialized = True
+        self.__initialized = True
 
     def rename(self, name=None, index=-1):
         """ Rename a specified column
@@ -539,11 +553,11 @@ class Spreadsheet(object):
         # Transpose spreadsheet to edit column
         self.toColumns()
 
-        self.spreadsheet[index][0] = name
+        self.__spreadsheet[index][0] = name
 
     def removeColumn(self, column=-1):
         """
-            Removes a column in self.spreadsheet
+            Removes a column in self.__spreadsheet
 
             Attributes:
                 column (int, str): index or string indicating column to remove
@@ -555,33 +569,64 @@ class Spreadsheet(object):
         if isinstance(column, str):
             column = self.getColumnIndex(column)
 
-        del self.spreadsheet[column]
+        del self.__spreadsheet[column]
 
     def removeRow(self, row=-1):
         """
-            Removes a row in self.spreadsheet
+            Removes a row in self.__spreadsheet
 
             Attributes:
                 row (int): index of row to remove
         """
         self.toRows()
 
-        del self.spreadsheet[row]
+        del self.__spreadsheet[row]
 
     def reset(self):
-        """ Reset all data in this class
+        """ 
+            Reset all data in this class
         """
 
-        self.spreadsheet = list()  # list containing spreadsheet
+        self.__spreadsheet = list()  # list containing spreadsheet
 
-        self.filePath = None  # location of the spreadsheet
-        self.savePath = None  # location of the spreadsheet
+        self.__filePath = None  # location of the spreadsheet
+        self.__savePath = None  # location of the spreadsheet
 
-        self.loaded = False  # spreadsheet loaded?
-        self.initialized = False  # spreadsheet initialized?
-        self.transposed = False  # checks if rows (=f) or columns (=t)
+        self.__loaded = False  # spreadsheet loaded?
+        self.__initialized = False  # spreadsheet initialized?
+        self.__transposed = False  # checks if rows (=f) or columns (=t)
 
-        self.iter_index = 0  # Used for next() function
+        self.__iter_index = 0  # Used for next() function
+
+    def row(self, row=0):
+        """
+            Get row at specified index or add row if row is a list
+
+            Attributes:
+                row (int): index for desired row
+                row (list): row to add
+
+            Returns:
+                list: row elements
+        """
+
+        # If row is an integer, get row at that index
+        if isinstance(row, int):
+            self.toRows()
+            return self.__spreadsheet[index+1]
+
+        elif isinstance(row, list):
+
+            # If row is none, raise an error
+            if row is None:
+                raise ValueError("Please specify a new row list" +
+                                 "to add to the spreadsheet. E.g.," +
+                                 " Spreadsheet.row(rowAsList)")
+
+            # Transpose spreadsheet to edit row
+            self.toRows()
+            self.__spreadsheet.append(newRow)
+            self.refresh()
 
     def save(self, savePath=None, saveContent=None,
              saveType='w', delimiter="\t"):
@@ -600,56 +645,50 @@ class Spreadsheet(object):
         saveFile.write(saveContent)
         saveFile.close()
 
-    def setColumn(self, column, newColumnCells, newHeader=False):
-        """
-            Set a column to a new list of values
-            @param  column: index or name of column
-            @param  newColumnCells: list of new column values
-        """
-        self.toColumns()
-        if len(self.spreadsheet[self.getColumnIndex(column)]) <= 1:
-            self.spreadsheet[self.getColumnIndex(column)].extend(newColumnCells)
-        else:
-            if newHeader is True:
-                self.spreadsheet[self.getColumnIndex(column)] = newColumnCells
-            else:
-                self.spreadsheet[self.getColumnIndex(column)] = [self.spreadsheet[self.getColumnIndex(column)][0]]+newColumnCells
-
     def setData(self, data):
-        """ set spreadsheet to new data
-            @param  data: user specified spreadsheet data
         """
-        # If generator is passed through, create spreadsheet list first
-        if isinstance(data, (1 for i in xrange(1))):
-            spreadsheet = list()
-            append = spreadsheet.append
-
-            # Loop through the data generator
-            for row in data:
-                append(row)
-
-            self.spreadsheet = spreadsheet
-        else:
-            self.spreadsheet = data
-
-    def setFilePath(self, filePath):
-        """ Set this object to a new file
-            @param  filePath: location to new file
+            Set spreadsheet to new data
+            
+            Attributes:
+                data: user specified spreadsheet data
         """
-        self.initialize(filePath)
+        list_type = isinstance(data, list)
+        spreadsheet_type = isinstance(data, Spreadsheet)
 
-    def setSavePath(self, savePath):
+        # if data is neither a list or Spreadsheet, raise TypeError()
+        if not list_type and not spreadsheet_type:
+            raise TypeError("Input data must be a list() or Spreadsheet().")
+
+        # If Spreadsheet is passed in data, set Spreadsheet to columns
+        if spreadsheet_type:
+            self.toColumns()
+            data.toColumns()
+
+        spreadsheet = list()
+        append = spreadsheet.append
+
+        # Loop through the data to create a new spreadsheet
+        for row in data:
+            append(row)
+
+        # Assign this spreadsheet to the new one
+        self.__spreadsheet = spreadsheet
+
+    def savePath(self, savePath=None):
         """
-            Sets the location for saved files
+            Sets or gets the location for saved files
 
             Attributes:
                 savePath (str): location to store saved files
         """
-        self.savePath = savePath
+        if savePath is None:
+            return self.__savePath
+        else:
+            self.__savePath = savePath
 
     def sort(self, column=0, reverse=False, hasTitle=True):
         """
-            Sorts spreadsheet based on column
+            Sorts entire spreadsheet based on column
 
             Attributes:
                 column (int): column to sort by
@@ -657,17 +696,35 @@ class Spreadsheet(object):
                 hasTitle (bool): if True, sort spreadsheet from 2nd row (i==1)
         """
 
+        def get_cell(row):
+            """
+                Returns cell value at column index specified
+                
+                Attributes:
+                    row (list): row as a list
+                    column (int): column index from parent method
+
+                Returns:
+                    int, str: value of cell at specified column
+            """
+            return row[column]
+
         column = self.getColumnIndex(column)
         self.toRows()
 
+        # Define different parts of the spreadsheet for processing
+        spreadsheet = self.__spreadsheet
+        spreadsheet_header = [spreadsheet[0]]
+        spreadsheet_body = spreadsheet[1:]
+
+        # If hasTitle is True, the header is not included in sorting
         if hasTitle is True:
-            header = self.spreadsheet[0]
-            body = sorted(self.spreadsheet[1:],
-                          key=lambda row: row[column], reverse=reverse)
-            self.spreadsheet = [header] + body
+            body = sorted(spreadsheet_body, key=get_cell, reverse=reverse)
+            self.__spreadsheet = spreadsheet_header + body
+
+        # Include header in sorting
         else:
-            self.spreadsheet = sorted(self.spreadsheet,
-                                      key=lambda row: row[column],
+            self.__spreadsheet = sorted(spreadsheet, key=get_cell, 
                                       reverse=reverse)
 
     def toColumns(self):
@@ -675,7 +732,7 @@ class Spreadsheet(object):
             Transpose to columns
         """
         # Transpose spreadsheet to edit column
-        if not self.transposed:
+        if not self.__transposed:
             self.transpose()
 
     def toRows(self):
@@ -683,31 +740,36 @@ class Spreadsheet(object):
             Transpose to rows
         """
         # Transpose spreadsheet to edit rows
-        if self.transposed:
+        if self.__transposed:
             self.transpose()
 
     def toString(self, fileToString=None):
-        """ Print input to screen
-            @param fileToString: file to print out as string to screen.
+        """ 
+            Print input to screen
+            
+            Attributes:
+                fileToString (list): file to print out as string to screen.
         """
+
+        string = ""
 
         if fileToString is None:
             self.toRows()
-            fileToString = self.spreadsheet
+            fileToString = self.__spreadsheet
 
-        if self.initialized:
+        if self.__initialized:
             join = str.join
 
             # Loop through the lines to join them as strings
             for line in fileToString:
 
                 line = [str(item).rjust(20, ' ') for item in line]
-                print join("\t\t", line)
+                string += join("\t\t", line)+"\n"
         else:
             for line in fileToString:
-                print line
+                string += line
 
-        print "\n\n"
+        return string
 
     def transpose(self):
         """
@@ -717,7 +779,7 @@ class Spreadsheet(object):
 
         # CALL THESE JUST ONCE BEFORE LOOP(S)
         append = temp_spreadsheet.append
-        longest_list = len(max(self.spreadsheet, key=len))
+        longest_list = len(max(self.__spreadsheet, key=len))
 
         # Loop through the longest row (transposed=f) or column (transposed=t)
         for index in xrange(longest_list):
@@ -729,7 +791,7 @@ class Spreadsheet(object):
             append2 = temp_spreadsheet[index].append
 
             # Loop through current spreadsheet to transpose rows<==>columns
-            for line in self.spreadsheet:
+            for line in self.__spreadsheet:
                 try:
                     append2(line[index])
                 except(IndexError):
@@ -737,67 +799,15 @@ class Spreadsheet(object):
                     # If the specified cell does not exist, i.e., blank
                     append2("")
 
-        self.spreadsheet = temp_spreadsheet
-        self.transposed = not self.transposed
-
-    # def getColumn(self, column, number=False, header=False):
-    #    """
-    #        Gets column at specified index
-
-    #        Attributes:
-    #            column (int): index or name of desired column
-    #            number (bool): return floats of numbers in column
-    #            header (bool): include column header
-
-    #        Returns:
-    #            list of column
-    #    """
-    #    self.toColumns()
-
-    #    if number is True:
-    #        # print self.spreadsheet[self.getColumnIndex(column)][1:]
-    #        column = [self.spreadsheet[0]] + \
-    #                 [float(row) for row in
-    #                  self.spreadsheet[self.getColumnIndex(column)][1:]
-    #                  if row != '']
-    #    else:
-    #        column = self.spreadsheet[self.getColumnIndex(column)]
-
-    #    if header is False:
-    #       return column[1:]
-
-    #    return column
-
-    # --> Changing to single "row" method
-    # def addRow(self, newRow=None):
-    #     """ 
-    #         Add a row to the spreadsheet
-    #         @param  newRow: (list) row to add
-    #     """
-
-    #     # If newRow is none, raise an error
-    #     if newRow is None:
-    #         raise ValueError("Please specify a new row list" +
-    #                          "to add to the spreadsheet. E.g.," +
-    #                          " Spreadsheet.addRow(rowAsList)")
-    # 
-    #     # Transpose spreadsheet to edit row
-    #     self.toRows()
-    #     self.spreadsheet.append(newRow)
-    #     self.refresh()
-
-    # --> Changing to single "cell()" method
-    # def setCell(self, row, column, content):
-    #     """ Set a cell to content
-    #         @param  content: content to fill cell
-    #     """
-    #     self.toRows()
-    #     self.spreadsheet[row][column] = content
+        self.__spreadsheet = temp_spreadsheet
+        self.__transposed = not self.__transposed
 
 
 if __name__ == "__main__":
 
+    # TEST 0: Create spreadsheet from file
     d = Spreadsheet("data/spreadsheet_test.csv",delimiter=",")
+    print("#TEST 0: Create Spreadsheet() from file SUCCESSFUL")
 
     # TEST 1: Transposition
     print("\n# TEST 1: Transposition")
@@ -808,50 +818,100 @@ if __name__ == "__main__":
     # TEST 2: Fill columns with text
     print("\n# TEST 2: Fill columns with text")
     print d.column(0)
-    d.fillColumn(0, "filled")
+    d.fill(0, "filled")
     print d.column(0)
     d.column([1, 2, 3])
     print d.column(-1)
-    d.fillColumn(-1, "filled")
+    d.fill(-1, "filled")
     print d.column(-1)
 
-    # Test 3: Add columns
-    print("\n# Test 3: Add columns")
+    # TEST 3: Add columns
+    print("\n# TEST 3: Add columns")
     d.column([1, 2, 3, 4, 5])
     print d.column(-1)
 
+    # TEST 4: Add cell to column
     d.addToColumn(2, "test")
-    print d.spreadsheet
-    print d.spreadsheet
+    print d.getSpreadsheet()
+    print d.getSpreadsheet()
 
+    # TEST 5: Create new blank spreadsheet
     p = Spreadsheet(columns=["col1", "booh", "bah", "ble"] + ["too", "me"])
+    print("\n# TEST 5: Create blank Spreadsheet() SUCCESSFUL")
+
+    # TEST 6: Add columns
+    print("\n# TEST 6: Add columns")
     p.newColumn("blech")
     p.newColumn()
-    print "P:\t", p.spreadsheet
+    print "P:\t", p.getSpreadsheet()
+    
+    # TEST 7: Transpose newly created Spreadsheet() to rows then columns
+    print("\n# TEST 7: Transpose newly created Spreadsheet()")
     p.transpose()
-    print "P:\t", p.spreadsheet
+    print "P:\t", p.getSpreadsheet()
     p.transpose()
-    print "P:\t", p.spreadsheet
+    print "P:\t", p.getSpreadsheet()
 
+    # TEST 8: Prepare Spreadsheet() for saving
+    print("\n# TEST 8: Prepare Spreadsheet() for saving")
     print p.prepareForSave()
-    print p.addToColumn("col1", 87)
-    print p.addToColumn(0, 55)
-    print p.addToColumn(0, 785)
-    print p.addToColumn(1, 3)
+
+    # TEST 9: Add information to columns by index and name
+    print("\n# TEST 9: Add information to columns by index and name")
+    p.addToColumn("col1", 87)
+    p.addToColumn(0, 55)
+    p.addToColumn(0, 785)
+    p.addToColumn(1, 3)
     p.refresh()
-    print "FIRSTP:\t", p.spreadsheet
+    print "FIRSTP:\t", p.getSpreadsheet()
+
+    # TEST 10: Set cell to value
+    print("\n# TEST 10: Set cell to value")
     p.cell(3, 2, "SETSELL")
-    p.fillColumn("too", "can")
+    p.fill("too", "can")
     p.addToColumn(4, "acd")
-    print "P:\t", p.spreadsheet
-    p.fillColumn("ble", "{0}, {1}", cellList=[("$A{0}", 0), ("$C${0}", 1)])
-    p.fillColumn("col1", "{0}, {1}", cellList=[("{0}1", '0'), ("$C${0}", 1)])
-    # p.fillColumn("ble", "{0}, {1}")#, cellList=[("$A{0}", 0), ("$C${0}", 1)])
-    print "AFTER THE FILL:\t", p.spreadsheet
+    print "P:\t", p.getSpreadsheet()
+    
+    # TEST 11: Fill columns with text
+    print("\n# TEST 11: Fill columns with text")
+    p.fill("ble", "{0}, {1}", cellList=[("$A{0}", 0), ("$C${0}", 1)])
+    p.fill("col1", "{0}, {1}", cellList=[("{0}1", '0'), ("$C${0}", 1)])
+    print "AFTER THE FILL:\t", p.getSpreadsheet()
     p.toColumns()
-    print "ddP:\t", p.spreadsheet
+    print "Transposed to Columns:\t", p.getSpreadsheet()
+
+    # TEST 12: Remove specified columns
     p.removeColumn("bah")
     p.removeColumn("booh")
-    print "Removed column:\t", p.spreadsheet
+    print "Removed column:\t", p.getSpreadsheet()
+
+    # TEST 13: Get columns by string and float
+    print("\n# TEST 13: Get columns' indices by string and float")
+    print p.getColumnIndex('blech')
     print p.getColumnIndex('A')
     print p.getColumnIndex(00.0)
+
+    # TEST 14: compare __repr__ and toString() and sort
+    print("\n#TEST 14: compare __repr__ and toString() and sort")
+    p.addToColumn("too", "alpha")
+    print p.toString()
+    p.sort("too")
+    print p
+
+    # TEST 15: replace column with new data
+    print("\n# TEST 15: replace column with new data")
+    column = "ble"
+    new_data = [1,2,'a',False]
+    print("Column: {}\t\nNew data: {}".format(column, new_data))
+    p.column(column, new_data)
+    print p
+
+    # TEST 16: Set spreadsheet p to spreadsheet d
+    print("\n# TEST 16: Set spreadsheet p to spreadsheet d")
+    p.setData(d)
+    print p
+
+    # TEST 17: Set spreadsheet to new file path
+    print("\n# TEST 17: Set spreadsheet to new file path")
+    p.filePath("data/stoppuncs.txt")
+    print p
