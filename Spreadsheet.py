@@ -49,6 +49,7 @@
 #                   load() - Did not assign headers causing getHeaders()
 #                            to retrieve the first non-header row. Assigns
 #                            correct headers now.
+#                            self.initialized now works for all load cases.
 # - - - - - - - - - - - - -
 """Creates a manipulable spreadsheet object from a text file.
 
@@ -374,7 +375,7 @@ class Spreadsheet(object):
 
                 # Convert cell values to numbers
                 if number is True:
-                    body = [float(row) for row in column_body[1:] if row != '']
+                    body = [float(row) for row in column_body if row != '']
 
                     column = column_head + body
 
@@ -614,7 +615,8 @@ class Spreadsheet(object):
 
         if not self.initialized and self.spreadsheet[0] == "columnName":
             del(self.spreadsheet[0])
-            self.initialized = True
+
+        self.initialized = True
 
     def newColumn(self, name=" ", fillWith=" "):
         """
@@ -748,11 +750,12 @@ class Spreadsheet(object):
             Returns:
                 list: row elements
         """
+        self.toRows()
 
         # If row is an integer, get row at that index
-        if isinstance(row, int):
-            self.toRows()
-            return self.spreadsheet[row + 1]
+        if isinstance(row, int) or isinstance(row, float):
+            row = int(row)
+            return self.spreadsheet[row]
 
         elif isinstance(row, list):
 
@@ -763,7 +766,6 @@ class Spreadsheet(object):
                                  " Spreadsheet.row(rowAsList)")
 
             # Transpose spreadsheet to edit row
-            self.toRows()
             self.spreadsheet.append(row)
             self.refresh()
 
@@ -812,6 +814,7 @@ class Spreadsheet(object):
 
         # Assign this spreadsheet to the new one
         self.spreadsheet = spreadsheet
+        self.initialized = True
 
     def savePath(self, savePath=None):
         """
@@ -904,9 +907,6 @@ class Spreadsheet(object):
 
                 line = [str(item).rjust(20, ' ') for item in line]
                 string += join("\t\t", line) + "\n"
-        else:
-            for line in fileToString:
-                string += line
 
         return string
 
