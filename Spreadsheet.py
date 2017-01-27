@@ -51,14 +51,7 @@
 #                            correct headers now.
 #                            self.initialized now works for all load cases.
 # - - - - - - - - - - - - -
-"""Creates a manipulable spreadsheet object from a text file.
 
-The Spreadsheet class is used to represent text files as objects for further
-use by other classes. This is a base class and does not inherit from other
-classes. Two methods exist in this class that can be used as static methods:
-(1) open(doc): open a specified document and (2) save().
-
-"""
 __author__ = "Glenn Abastillas"
 __copyright__ = "Copyright (c) August 21, 2015"
 __credits__ = "Glenn Abastillas"
