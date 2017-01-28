@@ -40,6 +40,8 @@
 # 9a.[2017/01/24] - changed fillColumn() to fill(), initialize() to load()
 # 9b.[2017/01/24] - collapsed setters and getters for savePath() and filePath()
 # 9c.[2017/01/24] - updated load() method
+# 10.[2017/01/25] - added is_[state]() methods for loaded, initialized, and
+#                   transposed states.
 # - - - - - - - - - - - - -
 """ Creates a manipulable spreadsheet object from a text file.
 
@@ -418,7 +420,7 @@ class Spreadsheet(object):
             @return string name of column
         """
         index = self.getColumnIndex(column)
-        return self.getColumn(column=column, header=True)[0]
+        return self.column(column=column, header=True)[0]
 
     def getHeaders(self):
         """ return headers for columns in the spreadsheet """
@@ -456,6 +458,24 @@ class Spreadsheet(object):
         """
         return self.__spreadsheet
 
+    def is_initialized(self):
+        """
+            Returns state of self.__initialized
+        """
+        return self.__initialized
+
+    def is_loaded(self):
+        """
+            Returns state of self.__loaded
+        """
+        return self.__loaded
+
+    def is_transposed(self):
+        """
+            Returns state of self.__transposed
+        """
+        return self.__transposed
+
     def load(self, filePath=None, delimiter="\t"):
         """ 
             Open the file and parse out rows and columns
@@ -480,9 +500,9 @@ class Spreadsheet(object):
         self.__loaded = True
         self.toRows()
 
-        first_row = self.__spreadsheet[0]
+        # first_row = self.__spreadsheet[0]
 
-        if not self.__initialized:
+        if not self.__initialized and self.__spreadsheet[0]=="columnName":
             del(self.__spreadsheet[0])
             self.__initialized = True
 
@@ -614,10 +634,10 @@ class Spreadsheet(object):
                 list: row elements
         """
 
-        # If row is an integer, get row at that index
+        # If row is an integer, get row at that row
         if isinstance(row, int):
             self.toRows()
-            return self.__spreadsheet[index+1]
+            return self.__spreadsheet[row+1]
 
         elif isinstance(row, list):
 
@@ -677,6 +697,7 @@ class Spreadsheet(object):
 
         # Assign this spreadsheet to the new one
         self.__spreadsheet = spreadsheet
+        self.__initialized = True
 
     def savePath(self, savePath=None):
         """
@@ -768,7 +789,7 @@ class Spreadsheet(object):
             for line in fileToString:
 
                 line = [str(item).rjust(20, ' ') for item in line]
-                string += join("\t\t", line)+"\n"
+                string += join("\t\t", line) + "\n"
         else:
             for line in fileToString:
                 string += line
