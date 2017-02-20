@@ -40,6 +40,8 @@
 # 9a.[2017/01/24] - changed fillColumn() to fill(), initialize() to load()
 # 9b.[2017/01/24] - collapsed setters and getters for savePath() and filePath()
 # 9c.[2017/01/24] - updated load() method
+# 10.[2017/01/25] - added is_[state]() methods for loaded, initialized, and
+#                   transposed states.
 # 10.[2017/01/26] - completed Documentation for the Spreadsheet object. Updated
 #                   notes for several methods. Fixed the following bugs:
 #
@@ -50,6 +52,7 @@
 #                            to retrieve the first non-header row. Assigns
 #                            correct headers now.
 #                            self.initialized now works for all load cases.
+# 11.[2017/02/19] - Added getState() method and revertTranspose() methods.
 # - - - - - - - - - - - - -
 
 __author__ = "Glenn Abastillas"
@@ -284,10 +287,12 @@ class Spreadsheet(object):
                 column (int): column to fill (index or string)
                 data (str, int): data to insert
         """
+        state = self.getState()
         index = self.getColumnIndex(column)
 
         self.toColumns()
         self.spreadsheet[index].append(data)
+        self.revertTranspose(state)
 
     def addToRow(self, row=-1, data=None):
         """
@@ -297,10 +302,13 @@ class Spreadsheet(object):
                 row (int): index of row to add data to
                 data (list): data to insert
         """
+        state = self.getState()
+        self.toRows()
         if isinstance(data, list):
             self.spreadsheet[row].extend(data)
         else:
             self.spreadsheet[row].append(data)
+        self.revertTranspose(state)
 
     def cell(self, row, column, data=None):
         """
@@ -314,8 +322,10 @@ class Spreadsheet(object):
         if data is None:
             return self.getRow(row)[column]
         else:
+            state = self.getState()
             self.toRows()
             self.spreadsheet[row][column] = data
+            self.revertTranspose(state)
 
     def column(self, column=0, data=None, number=False, header=False):
         """
@@ -334,6 +344,7 @@ class Spreadsheet(object):
         """
 
         # Transpose spreadsheet to edit columns
+        state = self.getState()
         self.toColumns()
 
         # If column parameter is an integer, retrieve column at index
@@ -394,6 +405,8 @@ class Spreadsheet(object):
                              "to add to the spreadsheet. E.g.," +
                              "Spreadsheet.addColumn(columnAsList)")
 
+        self.revertTranspose(state)
+
     def filePath(self, filePath=None, delimiter="\t"):
         """
             Sets or gets the file path
@@ -411,8 +424,7 @@ class Spreadsheet(object):
         else:
             self.load(filePath, delimiter)
 
-    def fill(self, column=-1, fillWith=" ",
-             skipTitle=True, cellList=None):
+    def fill(self, column=-1, fillWith=" ", skipTitle=True, cellList=None):
         """
             Fills a column with text
 
@@ -424,6 +436,7 @@ class Spreadsheet(object):
                 skipTitle (bool): start filling on the second row
         """
         # Transpose spreadsheet to edit column
+        state = self.getState()
         self.toColumns()
 
         initialIndex = 0
@@ -443,7 +456,7 @@ class Spreadsheet(object):
         # if there is a a cellList, there are values to replace
         if cellList is not None:
 
-            # items in cellList are tuples
+            # items in cellList re tuples
             # the first part is the reference (e.g., "$A1" --> "$A{0}")
             # the second part is the row displacement, if any, (e.g., "-1")
             # for example,  [("$A{0}", "1"), ("$C${0}", "-1")] becomes:
@@ -462,11 +475,16 @@ class Spreadsheet(object):
                 for j in xrange(cellListLength):
 
                     cellListValue = cellList[j][1]
+                    # fillWithToReplace = cellList[j][0]
 
                     # if the cellList marker (i.e., {0}) to be replaced is a
                     # column the reference value has to be a letter
+
+                    # -- THIS NEEDS TO BE FIXED -- #
                     if isinstance(cellListValue, str):
-                        referenceValue = self.COLUMN_ALPHA[column]
+                        # -- referenceValue = self.COLUMN_ALPHA[column]
+                        referenceValue = str(self.getColumnIndex(column,
+                                                                 alphaIn=True))
 
                     # else, the reference value is a number
                     else:
@@ -477,14 +495,16 @@ class Spreadsheet(object):
 
                     # marker indicates where the reference should go
                     # (e.g., "{0} goes here and then {1}")
-                    marker = "{}{}{}".format("{", str(j), "}")
+                    # -- NOT USED -- marker = "{}{}{}".format("{", str(j), "}")
 
                     # replace the marker in the fillWith string with the
                     # reference cell, e.g., "{0} goes here and then {1}";
                     # marker = "{0}"; reference = "$A$1"
                     # "$A$1 goes here and then {1}"
-                    fillWithToReplace = fillWithToReplace.replace(marker,
-                                                                  reference)
+                    # fillWithToReplace = fillWithToReplace.replace(marker,
+                    #                                               reference)
+                    fillWithToReplace = reference
+                    print fillWithToReplace
 
                 append(fillWithToReplace)
 
@@ -497,19 +517,30 @@ class Spreadsheet(object):
             for row in columnForLoop:
                 append(fillWith)
 
+        # print newColumn
         self.spreadsheet[column] = newColumn
+        self.revertTranspose(state)
 
     def getColumnCount(self):
-        """Return number of columns in spreadsheet data """
+        """
+            Return number of columns in spreadsheet data
+        """
+        state = self.getState()
         self.toColumns()
-        return len(self.spreadsheet)
+        columnCount = len(self.spreadsheet)
+        self.revertTranspose(state)
+        return columnCount
 
-    def getColumnIndex(self, column):
+    def getColumnIndex(self, column, alphaIn=False, alphaOut=False):
         """
             Get the numerical index for columns as per Excel coordinates
 
             Attributes:
                 column (str, int): column character (e.g., 'A') or column name
+                alphaIn (bool): indicate whether the string refers to excel
+                                column headers (e.g., AA, AB, etc.)
+                alphaOut (bool): indicates whether the output should be in
+                                 excel column header format (e.g., AA)
 
             Returns:
                 int: index of column specified
@@ -517,17 +548,37 @@ class Spreadsheet(object):
 
         # If 'column' is a number type, return the integer of that number
         if isinstance(column, int) or isinstance(column, float):
-            return int(column)
+
+            columnIndex = int(column)
+
+            if alphaOut:
+
+                columnIndex = ""
+
+                for letter in str(column):
+                    columnIndex += self.COLUMN_ALPHA[int(letter) - 1]
+
+            return columnIndex
 
         # If 'column' is a single character, return it's index
-        elif len(column) == 1:
-            return self.COLUMN_ALPHA.index(column.upper())
+        if alphaIn:
+            column = column.upper()
+            len_alpha = len(column)
+            columnIndex = 0
+
+            for i, letter in enumerate(column):
+                letter_index = self.COLUMN_ALPHA.index(letter) + 1
+                exponent = len_alpha - (i + 1)
+                columnIndex += letter_index * (26 ** exponent)
+
+            return columnIndex
 
         # If 'column' is a string, return it's index
         else:
+            state = self.getState()
             self.toRows()
             columnIndex = self.spreadsheet[0].index(column)
-            self.toColumns()
+            self.revertTranspose(state)
             return columnIndex
 
     def getColumnName(self, column):
@@ -540,21 +591,32 @@ class Spreadsheet(object):
             Returns:
                 str: name of column
         """
+        state = self.getState()
         index = self.getColumnIndex(column=column)
         self.toColumns()
-        return self.spreadsheet[index][0]
+        columnName = self.spreadsheet[index][0]
+        self.revertTranspose(state)
+        return columnName
 
     def getHeaders(self):
         """
             Return headers for columns in the spreadsheet
         """
+        state = self.getState()
         self.toColumns()
-        return [column[0] for column in self.spreadsheet]
+        headers = [column[0] for column in self.spreadsheet]
+        self.revertTranspose(state)
+        return headers
 
     def getRowCount(self):
-        """Return number of rows in spreadsheet data """
+        """
+            Returns number of rows in spreadsheet data
+        """
+        state = self.getState()
         self.toRows()
-        return len(self.spreadsheet) - 1
+        rowCount = len(self.spreadsheet) - 1
+        self.revertTranspose(state)
+        return rowCount
 
     def getRowIndex(self, data):
         """
@@ -567,12 +629,13 @@ class Spreadsheet(object):
                 int: index of row
                 None: if data does not match row[0]
         """
+        state = self.getState()
         self.toRows()
 
         for row in self.spreadsheet:
             if data in row[0]:
                 return self.spreadsheet.index(row)
-
+        self.revertTranspose(state)
         return None
 
     def getSpreadsheet(self):
@@ -581,6 +644,33 @@ class Spreadsheet(object):
             @return List of rows and columns with data
         """
         return self.spreadsheet
+
+    def getState(self):
+        """
+        Return state of transposition
+
+        Returns:
+            bool: True if transposed, False if not
+        """
+        return self.transposed
+
+    def is_initialized(self):
+        """
+            Returns state of self.initialized
+        """
+        return self.initialized
+
+    def is_loaded(self):
+        """
+            Returns state of self.loaded
+        """
+        return self.loaded
+
+    def is_transposed(self):
+        """
+            Returns state of self.transposed
+        """
+        return self.transposed
 
     def load(self, filePath=None, delimiter="\t"):
         """
@@ -712,9 +802,11 @@ class Spreadsheet(object):
             Attributes:
                 row (int): index of row to remove
         """
+        state = self.getState()
         self.toRows()
 
         del self.spreadsheet[row]
+        self.revertTranspose(state)
 
     def reset(self):
         """
@@ -743,6 +835,7 @@ class Spreadsheet(object):
             Returns:
                 list: row elements
         """
+        state = self.getState()
         self.toRows()
 
         # If row is an integer, get row at that index
@@ -762,24 +855,33 @@ class Spreadsheet(object):
             self.spreadsheet.append(row)
             self.refresh()
 
+        self.revertTranspose(state)
+
     def save(self, savePath=None, savedata=None,
              saveType='w', delimiter="\t"):
-        """Write data out to a file
-            @param  savePath: name of the file to be saved
-            @param  savedata: list of rows/columns to be saved
-            @param  saveType: indicate overwrite ('w') or append ('a')
         """
+        Writes data out to a file
+
+        Args:
+            savePath (str): name of the file to be saved
+            savedata (str): list of rows/columns to be saved
+            saveType (str): indicate overwrite ('w') or append ('a')
+            delimiter (str): type of delimiter to use for output
+        """
+
+        if savePath is None:
+            savePath = self.savePath
+
         if savedata is None:
             savedata = self.prepareForSave(delimiter=delimiter)
         else:
             savedata = self.prepareForSave(spreadsheet=savedata,
                                            delimiter=delimiter)
 
-        saveFile = open(savePath, saveType)
-        saveFile.write(savedata)
-        saveFile.close()
+        with open(savePath, saveType) as fout:
+            fout.write(savedata)
 
-    def setData(self, data):
+    def setData(self, data, asRows=True):
         """
             Set spreadsheet to new data
 
@@ -808,6 +910,7 @@ class Spreadsheet(object):
         # Assign this spreadsheet to the new one
         self.spreadsheet = spreadsheet
         self.initialized = True
+        self.transposed = asRows
 
     def savePath(self, savePath=None):
         """
@@ -867,7 +970,7 @@ class Spreadsheet(object):
             Transpose to columns
         """
         # Transpose spreadsheet to edit column
-        if not self.transposed:
+        if not self.getState():
             self.transpose()
 
     def toRows(self):
@@ -875,7 +978,7 @@ class Spreadsheet(object):
             Transpose to rows
         """
         # Transpose spreadsheet to edit rows
-        if self.transposed:
+        if self.getState():
             self.transpose()
 
     def toString(self, fileToString=None):
@@ -889,6 +992,7 @@ class Spreadsheet(object):
         string = ""
 
         if fileToString is None:
+            state = self.getState()
             self.toRows()
             fileToString = self.spreadsheet
 
@@ -900,7 +1004,7 @@ class Spreadsheet(object):
 
                 line = [str(item).rjust(20, ' ') for item in line]
                 string += join("\t\t", line) + "\n"
-
+        self.revertTranspose(state)
         return string
 
     def transpose(self):
@@ -932,126 +1036,14 @@ class Spreadsheet(object):
                     append2("")
 
         self.spreadsheet = temp_spreadsheet
-        self.transposed = not self.transposed
+        self.transposed = not self.getState()
 
+    def revertTranspose(self, prior_state):
+        """
+        Transpose class if prior_state is different from current state
 
-if __name__ == "__main__":
-
-    # TEST 0: Create spreadsheet from file
-    d = Spreadsheet("data/spreadsheet_test.csv", delimiter=",")
-    print("#TEST 0: Create Spreadsheet() from file SUCCESSFUL")
-
-    # TEST 1: Transposition
-    print("\n# TEST 1: Transposition")
-    print d.getSpreadsheet()
-    d.transpose()
-    print d.getSpreadsheet()
-
-    # TEST 2: Fill columns with text
-    print("\n# TEST 2: Fill columns with text")
-    print d.column(0)
-    d.fill(0, "filled")
-    print d.column(0)
-    d.column([1, 2, 3])
-    print d.column(-1)
-    d.fill(-1, "filled")
-    print d.column(-1)
-
-    # TEST 3: Add columns
-    print("\n# TEST 3: Add columns")
-    d.column([1, 2, 3, 4, 5])
-    print d.column(-1)
-
-    # TEST 4: Add cell to column
-    d.addToColumn(2, "test")
-    print d.getSpreadsheet()
-    print d.getSpreadsheet()
-
-    # TEST 5: Create new blank spreadsheet
-    p = Spreadsheet(columns=["col1", "booh", "bah", "ble"] + ["too", "me"])
-    print("\n# TEST 5: Create blank Spreadsheet() SUCCESSFUL")
-
-    # TEST 6: Add columns
-    print("\n# TEST 6: Add columns")
-    p.newColumn("blech")
-    p.newColumn()
-    print "P:\t", p.getSpreadsheet()
-
-    # TEST 7: Transpose newly created Spreadsheet() to rows then columns
-    print("\n# TEST 7: Transpose newly created Spreadsheet()")
-    p.transpose()
-    print "P:\t", p.getSpreadsheet()
-    p.transpose()
-    print "P:\t", p.getSpreadsheet()
-
-    # TEST 8: Prepare Spreadsheet() for saving
-    print("\n# TEST 8: Prepare Spreadsheet() for saving")
-    print p.prepareForSave()
-
-    # TEST 9: Add information to columns by index and name
-    print("\n# TEST 9: Add information to columns by index and name")
-    p.addToColumn("col1", 87)
-    p.addToColumn(0, 55)
-    p.addToColumn(0, 785)
-    p.addToColumn(1, 3)
-    p.refresh()
-    print "FIRSTP:\t", p.getSpreadsheet()
-
-    # TEST 10: Set cell to value
-    print("\n# TEST 10: Set cell to value")
-    p.cell(3, 2, "SETSELL")
-    p.fill("too", "can")
-    p.addToColumn(4, "acd")
-    print "P:\t", p.getSpreadsheet()
-
-    # TEST 11: Fill columns with text
-    print("\n# TEST 11: Fill columns with text")
-    p.fill("ble", "{0}, {1}", cellList=[("$A{0}", 0), ("$C${0}", 1)])
-    p.fill("col1", "{0}, {1}", cellList=[("{0}1", '0'), ("$C${0}", 1)])
-    print "AFTER THE FILL:\t", p.getSpreadsheet()
-    p.toColumns()
-    print "Transposed to Columns:\t", p.getSpreadsheet()
-
-    # TEST 12: Remove specified columns
-    p.removeColumn("bah")
-    p.removeColumn("booh")
-    print "Removed column:\t", p.getSpreadsheet()
-
-    # TEST 13: Get columns by string and float
-    print("\n# TEST 13: Get columns' indices by string and float")
-    print p.getColumnIndex('blech')
-    print p.getColumnIndex('A')
-    print p.getColumnIndex(00.0)
-
-    # TEST 14: compare __repr__ and toString() and sort
-    print("\n#TEST 14: compare __repr__ and toString() and sort")
-    p.addToColumn("too", "alpha")
-    print p.toString()
-    p.sort("too")
-    print p
-
-    # TEST 15: replace column with new data
-    print("\n# TEST 15: replace column with new data")
-    column = "ble"
-    new_data = [1, 2, 'a', False]
-    print("Column: {}\t\nNew data: {}".format(column, new_data))
-    p.column(column, new_data)
-    print p
-
-    # TEST 16: Set spreadsheet p to spreadsheet d
-    print("\n# TEST 16: Set spreadsheet p to spreadsheet d")
-    p.setData(d)
-    print p
-
-    # TEST 17: Set spreadsheet to new file path
-    print("\n# TEST 17: Set spreadsheet to new file path")
-    # p.filePath("data/stoppuncs.txt")
-    print p
-    print p.getColumnIndex('numbers')
-
-    # TEST 18: Set spreadsheet to new file path
-    print("\n# TEST 18: Set spreadsheet to new file path")
-    print p.getHeaders()
-    print p.getColumnName(2)
-    # p.filePath("data/stoppuncs.txt")
-    # print p
+        Args:
+            state1 (bool): original state of document
+        """
+        if prior_state != self.getState():
+            self.transpose()
