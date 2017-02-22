@@ -291,7 +291,8 @@ class Spreadsheet(object):
         index = self.getColumnIndex(column)
 
         self.toColumns()
-        self.spreadsheet[index].append(data)
+        lastEmptyCellIndex = self.getLastEmptyCell(column)
+        self.spreadsheet[index][lastEmptyCellIndex] = data
         self.revertTranspose(state)
 
     def addToRow(self, row=-1, data=None):
@@ -520,6 +521,32 @@ class Spreadsheet(object):
         # print newColumn
         self.spreadsheet[column] = newColumn
         self.revertTranspose(state)
+
+    def getLastEmptyCell(self, column=-1):
+        """
+        Return last empty cell for specified column
+
+        Args:
+            column (str, int): column to find last empty cell for
+
+        Returns:
+            int of last empty cell with spreadsheet set to columns
+        """
+        state = self.getState()
+        index = self.getColumnIndex(column)
+
+        columnToCheck = self.column(index)
+
+        lastEmptyCell = 0
+
+        for i, row in enumerate(columnToCheck):
+            if row == "":
+                lastEmptyCell = -i
+            else:
+                break
+
+        self.revertTranspose(state)
+        return lastEmptyCell
 
     def getColumnCount(self):
         """
