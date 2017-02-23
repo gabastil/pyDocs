@@ -64,6 +64,29 @@ __version__ = "1.0.0"
 __maintainer__ = "Glenn Abastillas"
 
 
+def preserve_transpose(function):
+    """
+    Allows for preserving the original transposition of the
+    functions in Spreadsheet
+
+    Args:
+        function (function): wrapped function
+        args (tuple): arguments to be used by function
+        kwargs (dict): keyword arguments to be used by function
+
+    Returns:
+        whatever the wrapped function returns
+    """
+    def preserve(*args, **kwargs):
+        # print args[0].getState()
+        state = args[0].getState()
+        results = function(*args)
+        args[0].revertTranspose(state)
+        return results
+
+    return preserve
+
+
 class Spreadsheet(object):
 
     """
@@ -279,6 +302,7 @@ class Spreadsheet(object):
             self.iter_index = 0
             raise StopIteration
 
+    @preserve_transpose
     def addToColumn(self, column=-1, data=None):
         """
             Fill a column with text
@@ -287,14 +311,20 @@ class Spreadsheet(object):
                 column (int): column to fill (index or string)
                 data (str, int): data to insert
         """
-        state = self.getState()
+        # -- state = self.getState()
         index = self.getColumnIndex(column)
 
         self.toColumns()
         lastEmptyCellIndex = self.getLastEmptyCell(column)
-        self.spreadsheet[index][lastEmptyCellIndex] = data
-        self.revertTranspose(state)
+        columnForAppending = self.spreadsheet[index]
 
+        if lastEmptyCellIndex == 0:
+            columnForAppending.append(data)
+        else:
+            columnForAppending[lastEmptyCellIndex] = data
+        # -- self.revertTranspose(state)
+
+    @preserve_transpose
     def addToRow(self, row=-1, data=None):
         """
             Append or extend data to a row
@@ -303,14 +333,15 @@ class Spreadsheet(object):
                 row (int): index of row to add data to
                 data (list): data to insert
         """
-        state = self.getState()
+        # -- state = self.getState()
         self.toRows()
         if isinstance(data, list):
             self.spreadsheet[row].extend(data)
         else:
             self.spreadsheet[row].append(data)
-        self.revertTranspose(state)
+        # -- self.revertTranspose(state)
 
+    @preserve_transpose
     def cell(self, row, column, data=None):
         """
             Get or set value at specified cell
@@ -323,10 +354,10 @@ class Spreadsheet(object):
         if data is None:
             return self.getRow(row)[column]
         else:
-            state = self.getState()
+            # -- state = self.getState()
             self.toRows()
             self.spreadsheet[row][column] = data
-            self.revertTranspose(state)
+            # -- self.revertTranspose(state)
 
     def column(self, column=0, data=None, number=False, header=False):
         """
@@ -522,6 +553,7 @@ class Spreadsheet(object):
         self.spreadsheet[column] = newColumn
         self.revertTranspose(state)
 
+    @preserve_transpose
     def getLastEmptyCell(self, column=-1):
         """
         Return last empty cell for specified column
@@ -532,7 +564,7 @@ class Spreadsheet(object):
         Returns:
             int of last empty cell with spreadsheet set to columns
         """
-        state = self.getState()
+        # -- state = self.getState()
         index = self.getColumnIndex(column)
 
         columnToCheck = self.column(index)
@@ -541,21 +573,22 @@ class Spreadsheet(object):
 
         for i, row in enumerate(columnToCheck):
             if row == "":
-                lastEmptyCell = -i
+                lastEmptyCell = -(i + 1)
             else:
                 break
 
-        self.revertTranspose(state)
+        # -- self.revertTranspose(state)
         return lastEmptyCell
 
+    @preserve_transpose
     def getColumnCount(self):
         """
             Return number of columns in spreadsheet data
         """
-        state = self.getState()
+        # -- state = self.getState()
         self.toColumns()
         columnCount = len(self.spreadsheet)
-        self.revertTranspose(state)
+        # -- self.revertTranspose(state)
         return columnCount
 
     def getColumnIndex(self, column, alphaIn=False, alphaOut=False):
@@ -608,6 +641,7 @@ class Spreadsheet(object):
             self.revertTranspose(state)
             return columnIndex
 
+    @preserve_transpose
     def getColumnName(self, column):
         """
             Get the name of specified column
@@ -618,33 +652,36 @@ class Spreadsheet(object):
             Returns:
                 str: name of column
         """
-        state = self.getState()
+        # -- state = self.getState()
         index = self.getColumnIndex(column=column)
         self.toColumns()
         columnName = self.spreadsheet[index][0]
-        self.revertTranspose(state)
+        # -- self.revertTranspose(state)
         return columnName
 
+    @preserve_transpose
     def getHeaders(self):
         """
             Return headers for columns in the spreadsheet
         """
-        state = self.getState()
+        # -- state = self.getState()
         self.toColumns()
         headers = [column[0] for column in self.spreadsheet]
-        self.revertTranspose(state)
+        # -- self.revertTranspose(state)
         return headers
 
+    @preserve_transpose
     def getRowCount(self):
         """
             Returns number of rows in spreadsheet data
         """
-        state = self.getState()
+        # -- state = self.getState()
         self.toRows()
         rowCount = len(self.spreadsheet) - 1
-        self.revertTranspose(state)
+        # -- self.revertTranspose(state)
         return rowCount
 
+    @preserve_transpose
     def getRowIndex(self, data):
         """
             Get the index of a specified row
@@ -656,13 +693,13 @@ class Spreadsheet(object):
                 int: index of row
                 None: if data does not match row[0]
         """
-        state = self.getState()
+        # -- state = self.getState()
         self.toRows()
 
         for row in self.spreadsheet:
             if data in row[0]:
                 return self.spreadsheet.index(row)
-        self.revertTranspose(state)
+        # -- self.revertTranspose(state)
         return None
 
     def getSpreadsheet(self):
@@ -681,19 +718,19 @@ class Spreadsheet(object):
         """
         return self.transposed
 
-    def is_initialized(self):
+    def isInitialized(self):
         """
             Returns state of self.initialized
         """
         return self.initialized
 
-    def is_loaded(self):
+    def isLoaded(self):
         """
             Returns state of self.loaded
         """
         return self.loaded
 
-    def is_transposed(self):
+    def isTransposed(self):
         """
             Returns state of self.transposed
         """
@@ -822,6 +859,7 @@ class Spreadsheet(object):
 
         del self.spreadsheet[column]
 
+    @preserve_transpose
     def removeRow(self, row=-1):
         """
             Removes a row in self.spreadsheet
@@ -851,6 +889,7 @@ class Spreadsheet(object):
 
         self.iter_index = 0  # Used for next() function
 
+    @preserve_transpose
     def row(self, row=0):
         """
             Get row at specified index or add row if row is a list
@@ -1008,6 +1047,7 @@ class Spreadsheet(object):
         if self.getState():
             self.transpose()
 
+    @preserve_transpose
     def toString(self, fileToString=None):
         """
             Print input to screen
@@ -1016,10 +1056,10 @@ class Spreadsheet(object):
                 fileToString (list): file to print out as string to screen.
         """
 
+        state = self.getState()
         string = ""
 
         if fileToString is None:
-            state = self.getState()
             self.toRows()
             fileToString = self.spreadsheet
 
@@ -1072,5 +1112,6 @@ class Spreadsheet(object):
         Args:
             state1 (bool): original state of document
         """
+        self.refresh()
         if prior_state != self.getState():
             self.transpose()
