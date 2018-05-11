@@ -78,7 +78,7 @@ def preserve_transpose(function):
     def preserve(*args, **kwargs):
         # print args[0].getState()
         state = args[0].getState()
-        results = function(*args)
+        results = function(*args, **kwargs)
         args[0].revertTranspose(state)
         return results
 
